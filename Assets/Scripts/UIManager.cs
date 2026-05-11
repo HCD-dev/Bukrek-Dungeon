@@ -8,8 +8,10 @@ public class UIManager : MonoBehaviour
 
     [Header("UI Elemanlarý")]
     public GameObject infoPanel;
-    public TextMeshProUGUI statsText;
-    public Image unitPortrait; 
+    public Image unitPortrait;
+    public TextMeshProUGUI movementText;
+    public TextMeshProUGUI actionText;
+    public TextMeshProUGUI nameText;
 
     void Awake()
     {
@@ -19,17 +21,23 @@ public class UIManager : MonoBehaviour
 
     void Start()
     {
-        if (infoPanel) infoPanel.SetActive(false);
+       
     }
 
-    public void ShowUnitInfo(UnitController unit)
+    public void ShowUnitInfo(UnitController targetUnit)
     {
-        if (infoPanel == null) return;
+        if (targetUnit == null) return;
 
-        infoPanel.SetActive(true);
-        statsText.text = $"<b>{unit.unitName}</b>\n" +
-                         $"Hareket: {unit.currentMovementPoints} / {unit.maxMovementPoints}\n" +
-                         $"Aksiyon: {unit.actionPoints}";
+        // Ýsim kýsmýný günceller
+        if (nameText != null)
+            nameText.text = "<b>" + targetUnit.unitName + "</b>";
+
+        // Aksiyon kýsmýný istediðin formata sokar
+        if (actionText != null)
+        {
+            // Sadece Aksiyon puanýný gösterir
+            actionText.text = "Action: " + targetUnit.actionPoints;
+        }
     }
 
     public void HideUI()
