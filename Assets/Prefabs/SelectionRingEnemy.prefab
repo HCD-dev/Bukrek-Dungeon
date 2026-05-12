@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1592467985327840014}
   - component: {fileID: 6106205831571385270}
   m_Layer: 0
-  m_Name: SelectionRing
+  m_Name: SelectionRingEnemy
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -66,7 +66,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 19f872321f826f249b0750a261efcaec, type: 2}
+  - {fileID: 2100000, guid: aac80ccce582c694093fddaf0f2936a8, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

@@ -1,173 +1,267 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.EventSystems;
 using TMPro;
+using UnityEngine.EventSystems;
 
 public class UnitController : MonoBehaviour
 {
     public static UnitController selectedUnit;
-    public TileControl manuelBaslangicTile;
 
-    [Header("Birim Özellikleri")]
-    public string unitName = "Birlik";
-    public int maxMovementPoints = 4;
+
+
+    [Header("Birim Kimliði")]
+    public string unitName;
+
+    [Header("Stat Ayarlarý (Inspector)")]
+    public int maxHealth = 100;
+    public int currentHealth;
+    public int attackPower = 20;
+
+    [Space]
+    public int maxMovementPoints = 3; // Toplam hareket hakký
     public int currentMovementPoints;
-    public int actionPoints = 1;
-    public TextMeshProUGUI movementText;
-    public TextMeshProUGUI actionText; 
-    public TextMeshProUGUI nameText;
 
-    [Header("Ayarlar")]
-    public float moveSpeed = 5f;
-    public LayerMask gridLayer;
-    public LayerMask unitLayer;
-    public GameObject selectionVisual;
+    [Space]
+    public int maxActionPoints = 1;   // Saldýrý hakký
+    public int currentActionPoints;
+
+    public float moveSpeed = 8f;
+
+    [Header("Grid Ayarlarý (Senin Tile Ölçülerin)")]
+    public float tileWidth = 0.9f;   // Tile Scale X
+    public float tileLength = 0.9f;  // Tile Scale Z
+
+    [Header("UI ve Görsel")]
+    public GameObject selectionRing;
+    public TextMeshProUGUI movementText;
 
     private Vector3 targetPosition;
-    private TileControl currentTile;
     private bool isMoving = false;
+    [HideInInspector] public bool isSelectingTarget = false;
 
+    [Header("Menzil Ayarlarý")]
+    public int attackRange = 1; // Erlik için 1, Mergen için 5 yaparsýn
+    public TextMeshProUGUI rangeStatusText;
+
+    public int hitChance = 85;
+    public int rangeD = 1;
+    
     void Start()
     {
+        currentHealth = maxHealth;
         currentMovementPoints = maxMovementPoints;
+        currentActionPoints = maxActionPoints;
         targetPosition = transform.position;
-        if (selectionVisual) selectionVisual.SetActive(false);
 
-        // Zemin oluþumu için bekletiyoruz
-        Invoke("FindStartingTile", 0.5f);
-        UpdateMovementText();
-    }
-
-    public void UpdateMovementText()
-    {
-        // 1. Basit Movement: 5 yazýsý için
-        if (movementText != null)
-        {
-            movementText.text = "Movement: " + currentMovementPoints;
-        }
-
-        // 2. UIManager üzerindeki "Hareket: 5 / 5" kýsmýný tazelemek için
-        if (UIManager.Instance != null && selectedUnit == this)
-        {
-            UIManager.Instance.ShowUnitInfo(this);
-        }
+        if (selectionRing != null) selectionRing.SetActive(false);
+        if (movementText != null) movementText.text = "";
     }
 
     void Update()
     {
-        // 1. Týklama Algýlama
-        if (Mouse.current.leftButton.wasPressedThisFrame)
-        {
-            HandleInput();
-        }
+        HandleInput();
+        HandleHover();
 
-        // 2. Hareket Gerçekleþtirme
-        if (Vector3.Distance(transform.position, targetPosition) > 0.05f)
+        if (isMoving)
         {
-            isMoving = true;
             transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
-        }
-        else
-        {
-            isMoving = false;
+            if (Vector3.Distance(transform.position, targetPosition) < 0.001f)
+            {
+                transform.position = targetPosition;
+                isMoving = false;
+            }
         }
     }
+    void HandleHover()
+    {
+        if (selectedUnit == this && isSelectingTarget)
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit))
+            {
+                EnemyController enemy = hit.collider.GetComponent<EnemyController>();
+                if (enemy != null)
+                {
+                    float dist = Vector3.Distance(transform.position, enemy.transform.position) / 10f;
+                    int distanceInTiles = Mathf.RoundToInt(dist);
 
+                    if (distanceInTiles <= attackRange)
+                    {
+                        // Buradaki %90 yerine artýk ünitenin kendi hitChance deðerini yazýyoruz
+                        rangeStatusText.text = "<color=green>Menzil Ýçinde</color> Ýsabet Þansý: %" + hitChance;
+                    }
+                    else
+                    {
+                        rangeStatusText.text = "<color=red>Menzil Dýþýnda</color> Uzaklýk: " + distanceInTiles;
+                    }
+                    return;
+                }
+            }
+        }
+        if (rangeStatusText != null && rangeStatusText.text != "") rangeStatusText.text = "";
+    }
     void HandleInput()
     {
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
-
-        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
-
-        if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
-        {
-            // Ünite seçimi
-            if (((1 << hit.collider.gameObject.layer) & unitLayer) != 0)
+        
+            if (Input.GetMouseButtonDown(0))
             {
+                if (EventSystem.current.IsPointerOverGameObject()) 
+                {
+                    return;
+                }
+                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+            if (Physics.Raycast(ray, out RaycastHit hit))
+            {
+                // 1. SALDIRI MODU
+                if (isSelectingTarget)
+                {
+                    EnemyController enemy = hit.collider.GetComponent<EnemyController>();
+                    if (enemy != null && currentActionPoints > 0)
+                    {
+                        PerformAttack(enemy);
+                    }
+                    isSelectingTarget = false;
+                    return;
+                }
+
+                // 2. ÜNÝTE SEÇME
                 UnitController clickedUnit = hit.collider.GetComponent<UnitController>();
-                if (clickedUnit != null) SelectThisUnit(clickedUnit);
+                if (clickedUnit != null)
+                {
+                    SelectUnit(clickedUnit);
+                    return;
+                }
+
+                // 3. HAREKET (Hesaplamalý)
+                if (selectedUnit == this && currentMovementPoints > 0 && !isMoving)
+                {
+                    MoveToTarget(hit.point);
+                }
             }
-            // Hareket hedefi seçimi
-            else if (selectedUnit == this && !isMoving && ((1 << hit.collider.gameObject.layer) & gridLayer) != 0)
+        
+            }
+    }
+
+    void MoveToTarget(Vector3 worldPosition)
+    {
+        float stepSize = 10f;
+        float gridX = Mathf.Round(worldPosition.x / stepSize) * stepSize;
+        float gridZ = Mathf.Round(worldPosition.z / stepSize) * stepSize;
+
+        // Hedeflenen pozisyonu belirle
+        Vector3 finalTarget = new Vector3(gridX, transform.position.y, gridZ);
+
+        // --- DÜZELTME: KENDÝNE ÇARPMAMA KONTROLÜ ---
+        // Hedef noktada baþka collider var mý bakýyoruz.
+        Collider[] colliders = Physics.OverlapSphere(finalTarget, 1f);
+        foreach (var col in colliders)
+        {
+            // Eðer çarptýðýn þey bu ünitenin kendisi DEÐÝLSE ve bir karakterse
+            if (col.gameObject != this.gameObject && (col.GetComponent<UnitController>() || col.GetComponent<EnemyController>()))
             {
-                TileControl targetTile = hit.collider.GetComponent<TileControl>();
-                if (targetTile != null) TryMove(targetTile);
+                Debug.Log("<color=red>Hata: Tile dolu! Engel: " + col.gameObject.name + "</color>");
+                return;
             }
         }
-    }
+        // ------------------------------------------
 
-    void SelectThisUnit(UnitController targetUnit)
-    {
-        if (selectedUnit != null && selectedUnit.selectionVisual != null)
-            selectedUnit.selectionVisual.SetActive(false);
+        float distanceX = Mathf.Abs(finalTarget.x - transform.position.x) / stepSize;
+        float distanceZ = Mathf.Abs(finalTarget.z - transform.position.z) / stepSize;
+        int totalSteps = Mathf.RoundToInt(distanceX + distanceZ);
 
-        selectedUnit = targetUnit;
-
-        if (selectedUnit != null)
+        if (totalSteps > 0 && totalSteps <= currentMovementPoints)
         {
-            if (selectedUnit.selectionVisual != null) selectedUnit.selectionVisual.SetActive(true);
-            // UIManager Instance kontrolü
-            if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(selectedUnit);
-            selectedUnit.UpdateMovementText();
-        }
-    }
+            targetPosition = finalTarget;
+            isMoving = true;
+            currentMovementPoints -= totalSteps;
 
-    void TryMove(TileControl targetTile)
-    {
-        if (currentTile == null || targetTile == null || targetTile.isOccupied) return;
-
-        float diffX = Mathf.Abs(targetTile.transform.position.x - currentTile.transform.position.x);
-        float diffZ = Mathf.Abs(targetTile.transform.position.z - currentTile.transform.position.z);
-
-        // Mesafe hesabýna göre puan belirle
-        int requiredPoints = Mathf.RoundToInt((diffX + diffZ) / 10f);
-
-        if (currentMovementPoints >= requiredPoints && requiredPoints > 0)
-        {
-            currentMovementPoints -= requiredPoints;
-
-            // ÖNEMLÝ: Hareket baþlamadan önce her iki texti de günceller
             UpdateMovementText();
+            if (UIManager.Instance != null)
+                UIManager.Instance.ShowUnitInfo(this);
 
-            MoveTo(targetTile);
+            Debug.Log("<color=green>Hareket Onaylandý!</color>");
+        }
+        else if (totalSteps == 0)
+        {
+            Debug.Log("Zaten buradasýn.");
         }
         else
         {
-            Debug.Log("Yetersiz hareket puaný!");
+            Debug.Log("<color=red>Menzil Dýþý!</color> Gereken: " + totalSteps + " Mevcut: " + currentMovementPoints);
         }
     }
-
-    void MoveTo(TileControl targetTile)
+    public void SelectUnit(UnitController unit)
     {
-        if (currentTile != null) currentTile.isOccupied = false;
+        UnitController[] allUnits = Object.FindObjectsByType<UnitController>(FindObjectsSortMode.None);
+        foreach (UnitController u in allUnits) u.DeselectUnit();
 
-        currentTile = targetTile;
-        currentTile.isOccupied = true;
+        selectedUnit = unit;
+        if (unit.selectionRing != null) unit.selectionRing.SetActive(true);
 
-        targetPosition = new Vector3(targetTile.transform.position.x, transform.position.y, targetTile.transform.position.z);
-
-        // Hareket bittiðinde veya baþladýðýnda UI'ý tekrar tetikle (Garanti olsun)
-        if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
+        UIManager.Instance.ShowUnitInfo(unit);
+        unit.UpdateMovementText();
     }
 
-    void FindStartingTile()
+    public void DeselectUnit()
     {
-        Vector3 rayStart = transform.position + Vector3.up * 5f;
+        if (selectionRing != null) selectionRing.SetActive(false);
+        if (movementText != null) movementText.text = "";
+    }
 
-        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit hit, 50f, gridLayer))
+    public void UpdateMovementText()
+    {
+        if (movementText != null && selectedUnit == this)
+            movementText.text = "MP: " + currentMovementPoints;
+    }
+
+    public void PerformAttack(EnemyController target)
+    {
+        float dist = Vector3.Distance(transform.position, target.transform.position) / 10f;
+        int distanceInTiles = Mathf.RoundToInt(dist);
+
+        if (distanceInTiles <= attackRange)
         {
-            currentTile = hit.collider.GetComponent<TileControl>();
-            if (currentTile != null)
+            currentActionPoints--; // Saldýrý giriþimi yapýldýðý için puan düþer
+
+            // --- ÝSABET KONTROLÜ (Zar Atma) ---
+            int randomRoll = Random.Range(1, 101); // 1 ile 100 arasý sayý tut
+
+            if (randomRoll <= hitChance)
             {
-                currentTile.isOccupied = true;
-                targetPosition = new Vector3(currentTile.transform.position.x, transform.position.y, currentTile.transform.position.z);
-                UpdateMovementText();
-                Debug.Log("<color=green>BAÞLANGIÇ TÝLE BULUNDU:</color> " + currentTile.name);
+                // ÝSABET!
+                target.TakeDamage(attackPower);
+                Debug.Log("<color=green>ÝSABET!</color> " + unitName + " vurdu. Zar: " + randomRoll + " / " + hitChance);
             }
+            else
+            {
+                // ISKALADI!
+                Debug.Log("<color=orange>ISKALADI!</color> " + unitName + " hedefi tutturamadý. Zar: " + randomRoll + " / " + hitChance);
+            }
+
+            UIManager.Instance.ShowUnitInfo(this);
+            UpdateMovementText();
         }
         else
         {
-            Debug.LogError("KRÝTÝK HATA: Karakter baþlangýç tile'ýný bulamadý!");
+            Debug.Log("Çok uzak! Saldýramazsýn.");
         }
+    }
+
+    public void StartTargetSelection()
+{
+    if (currentActionPoints > 0)
+    {
+        isSelectingTarget = true;
+        // Ýstersen burada imleci deðiþtirebilirsin
+        Debug.Log("Saldýrý Modu Aktif. Bir düþmana týkla!");
+    }
+}
+
+    public void ResetPoints()
+    {
+        currentMovementPoints = maxMovementPoints;
+        currentActionPoints = maxActionPoints;
+        isSelectingTarget = false;
+        isMoving = false;
     }
 }
