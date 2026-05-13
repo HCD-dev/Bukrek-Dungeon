@@ -246,6 +246,7 @@ GameObject:
   - component: {fileID: 330585545}
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
+  - component: {fileID: 330585548}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -321,7 +322,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.38268343, y: 0, z: 0, w: 0.92387956}
-  m_LocalPosition: {x: 250, y: 40, z: 70}
+  m_LocalPosition: {x: 200, y: 40, z: 70}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -371,6 +372,27 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &330585548
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e32fb5401494724c82fbaa1de707148, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraControl
+  startPosition: {x: 200, y: 40, z: 70}
+  moveSpeed: 50
+  minX: 150
+  maxX: 250
+  minZ: 40
+  maxZ: 100
+  scrollSpeed: 500
+  minY: 10
+  maxY: 50
 --- !u!1001 &400639561
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1008,6 +1030,7 @@ MonoBehaviour:
   maxHealth: 200
   currentHealth: 0
   attackPower: 60
+  dodgeChance: 0
   maxMovementPoints: 7
   currentMovementPoints: 0
   maxActionPoints: 1
@@ -1015,12 +1038,9 @@ MonoBehaviour:
   moveSpeed: 40
   stepSize: 10
   selectionRing: {fileID: 1611491390}
-  movementText: {fileID: 1164045223}
-  dodgeText: {fileID: 1425440894}
   isSelectingTarget: 0
   attackRange: 1
   hitChance: 80
-  dodgeChance: 0
 --- !u!136 &634964621
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -1110,7 +1130,7 @@ Transform:
   m_GameObject: {fileID: 634964619}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 240, y: 5, z: 90}
+  m_LocalPosition: {x: 200, y: 5, z: 90}
   m_LocalScale: {x: 5, y: 5, z: 5}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1344,7 +1364,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7983341750427419052, guid: 614e86795579c264a9d8e581a26b2f79, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 250
+      value: 200
+      objectReference: {fileID: 0}
+    - target: {fileID: 7983341750427419052, guid: 614e86795579c264a9d8e581a26b2f79, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 140
       objectReference: {fileID: 0}
     - target: {fileID: 8694220790560636919, guid: 614e86795579c264a9d8e581a26b2f79, type: 3}
       propertyPath: m_SizeDelta.x
@@ -1600,7 +1624,7 @@ Transform:
   m_GameObject: {fileID: 863450838}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 250, y: 5, z: 90}
+  m_LocalPosition: {x: 210, y: 5, z: 90}
   m_LocalScale: {x: 5, y: 5, z: 5}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1624,6 +1648,7 @@ MonoBehaviour:
   maxHealth: 100
   currentHealth: 0
   attackPower: 20
+  dodgeChance: 20
   maxMovementPoints: 5
   currentMovementPoints: 0
   maxActionPoints: 2
@@ -1631,12 +1656,9 @@ MonoBehaviour:
   moveSpeed: 40
   stepSize: 10
   selectionRing: {fileID: 1961533236}
-  movementText: {fileID: 1164045223}
-  dodgeText: {fileID: 1425440894}
   isSelectingTarget: 0
   attackRange: 5
   hitChance: 95
-  dodgeChance: 20
 --- !u!1 &1124137565
 GameObject:
   m_ObjectHideFlags: 0
@@ -2564,7 +2586,7 @@ GameObject:
   - component: {fileID: 1658913894}
   - component: {fileID: 1658913893}
   m_Layer: 0
-  m_Name: Cube
+  m_Name: Wall
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2657,8 +2679,8 @@ Transform:
   m_GameObject: {fileID: 1658913892}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 324.6036, y: 24.3705, z: 165}
-  m_LocalScale: {x: 454.9511, y: 51.26272, z: 1}
+  m_LocalPosition: {x: 200, y: 24.3705, z: 165}
+  m_LocalScale: {x: 800, y: 51.26272, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -2944,7 +2966,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1673523950}
         m_TargetAssemblyTypeName: UIManager, Assembly-CSharp
-        m_MethodName: OnAttackImageClick
+        m_MethodName: OnMovementImageClick
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -3647,6 +3669,10 @@ PrefabInstance:
     - target: {fileID: 5851427929391414885, guid: 614e86795579c264a9d8e581a26b2f79, type: 3}
       propertyPath: m_HorizontalAlignment
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7983341750427419052, guid: 614e86795579c264a9d8e581a26b2f79, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 200
       objectReference: {fileID: 0}
     - target: {fileID: 8694220790560636919, guid: 614e86795579c264a9d8e581a26b2f79, type: 3}
       propertyPath: m_SizeDelta.x
