@@ -4,27 +4,58 @@ using TMPro;
 public class EnemyController : MonoBehaviour
 {
     [Header("Düþman Ayarlarý")]
-    public string enemyName = "Karakoncolos";
-    public int health = 100;
-    public TextMeshProUGUI hpText; // Baþýnýn üzerindeki TMP
+    public string enemyName = "Börü";
+    public int maxHealth = 100;
+    public int currentHealth; // Mevcut can
+    public int damage = 15;
+    public int attackRange = 1;
+    public int hitChance = 75;
+    public int dodgeChance = 10;
+
+    [Header("UI Elemanlarý")]
+    public TextMeshProUGUI hpText;
+    public TextMeshProUGUI enemyRangeText;
 
     void Start()
     {
+        // ÖNEMLÝ: Baþlangýçta mevcut caný maksimuma eþitle
+        currentHealth = maxHealth;
+
+        if (enemyRangeText != null) enemyRangeText.text = "";
         UpdateHPUI();
     }
 
-    public void TakeDamage(int damage)
+    public void SetRangeText(string message)
     {
-        health -= damage;
-        Debug.Log(enemyName + " " + damage + " hasar aldý!");
+        if (enemyRangeText != null) enemyRangeText.text = message;
+    }
+
+    public void ClearRangeText()
+    {
+        if (enemyRangeText != null) enemyRangeText.text = "";
+    }
+
+    public void TakeDamage(int damageAmount)
+    {
+        // HATA DÜZELTME: Hasarý maxHealth'ten deðil currentHealth'ten düþüyoruz
+        currentHealth -= damageAmount;
+
+        // Canýn 0'ýn altýna düþmesini engellemek için (Görsel açýdan iyi olur)
+        currentHealth = Mathf.Max(currentHealth, 0);
+
+        Debug.Log(enemyName + " " + damageAmount + " hasar aldý! Kalan Can: " + currentHealth);
         UpdateHPUI();
 
-        if (health <= 0) Die();
+        if (currentHealth <= 0) Die();
     }
 
     void UpdateHPUI()
     {
-        if (hpText != null) hpText.text = "HP: " + health;
+        if (hpText != null)
+        {
+            // \n kullanarak alt satýra geçirebilirsin, daha düzenli durur
+            hpText.text = "HP: " + currentHealth + "\nDODGE: %" + dodgeChance;
+        }
     }
 
     void Die()

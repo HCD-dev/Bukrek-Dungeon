@@ -15,12 +15,15 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI attackText;
     public TextMeshProUGUI rangeText;
     public TextMeshProUGUI hitChanceText;
+    public TextMeshProUGUI dodgeText;
 
     [Header("Görseller")]
     public Image unitPortrait;
     public Image attackActionImage;
+    public Image movementActionImage; // YENÝ: Hareket ikonu için Image bileþeni
     public Sprite erlikPortrait, mergenPortrait;
     public Sprite meleeIcon, rangedIcon;
+    public Sprite movementIconSprite; // YENÝ: Hareket ikonu sprite'ý
 
     void Awake() { Instance = this; }
     void Start()
@@ -31,6 +34,7 @@ public class UIManager : MonoBehaviour
         // Oyun baþlar baþlamaz tüm metinleri ve resimleri temizle
         ClearUI();
     }
+
     public void ShowUnitInfo(UnitController unit)
     {
         nameText.text = "<b>" + unit.unitName + "</b>";
@@ -45,9 +49,21 @@ public class UIManager : MonoBehaviour
         hitChanceText.text = "Hit Chance: %" + unit.hitChance;
 
         unitPortrait.color = Color.white;
+
         // Saldýrý resmi sadece AP varsa tam görünür
         attackActionImage.color = unit.currentActionPoints > 0 ? Color.white : new Color(1, 1, 1, 0.3f);
 
+        // YENÝ: Hareket resmi sadece MP varsa tam görünür
+        if (movementActionImage != null)
+        {
+            movementActionImage.sprite = movementIconSprite;
+            movementActionImage.color = unit.currentMovementPoints > 0 ? Color.white : new Color(1, 1, 1, 0.3f);
+        }
+
+        if (dodgeText != null)
+        {
+            dodgeText.text = "DODGE: %" + unit.dodgeChance;
+        }
         if (unit.unitName == "Mergen")
         {
             unitPortrait.sprite = mergenPortrait;
@@ -68,31 +84,55 @@ public class UIManager : MonoBehaviour
         actionText.text = "";
         movementText.text = "";
         healthText.text = "";
-        attackText.text = ""; 
+        attackText.text = "";
         unitPortrait.color = new Color(0, 0, 0, 0);
         attackActionImage.color = new Color(0, 0, 0, 0);
+        if (dodgeText != null)
+        {
+            dodgeText.text = "";
+        }
+
+        // YENÝ: Temizlerken hareket ikonunu da gizle
+        if (movementActionImage != null) movementActionImage.color = new Color(0, 0, 0, 0);
+    }
+
+    // YENÝ: Hareket ikonuna týklandýðýnda çalýþacak fonksiyon
+    public void OnMovementImageClick()
+    {
+        if (UnitController.selectedUnit != null)
+        {
+            if (UnitController.selectedUnit.currentMovementPoints > 0)
+            {
+                UnitController.selectedUnit.isMovementModeActive = true;
+                UnitController.selectedUnit.isSelectingTarget = false; // Saldýrý modunu kapat
+                Debug.Log("Hareket modu aktif!");
+            }
+            else
+            {
+                Debug.Log("Hareket puaný yetersiz!");
+            }
+        }
     }
 
     public void OnAttackImageClick()
     {
         if (UnitController.selectedUnit != null)
         {
-            // Eðer AP (Saldýrý Hakký) 0'dan büyükse seçimi baþlat
             if (UnitController.selectedUnit.currentActionPoints > 0)
             {
-                UnitController.selectedUnit.StartTargetSelection();
-                Debug.Log(UnitController.selectedUnit.unitName + " için hedef seçiliyor...");
+                UnitController.selectedUnit.isSelectingTarget = true;
+                UnitController.selectedUnit.isMovementModeActive = false; // Hareket modunu kapat
+                Debug.Log("Saldýrý modu aktif!");
             }
             else
             {
-                Debug.Log("<color=red>Saldýrý hakkýn bitti!</color>");
+                Debug.Log("Saldýrý puaný yetersiz!");
             }
         }
     }
 
     public void EndTurn()
     {
-        // Sahnedeki tüm UnitController'larý bul ve hepsini resetle
         UnitController[] allUnits = Object.FindObjectsByType<UnitController>(FindObjectsSortMode.None);
         foreach (UnitController unit in allUnits)
         {
@@ -100,20 +140,16 @@ public class UIManager : MonoBehaviour
             unit.DeselectUnit();
         }
 
-        // Seçili üniteyi temizle ve UI'ý kapat
         UnitController.selectedUnit = null;
         ClearUI();
 
         Debug.Log("<color=cyan>Yeni Tur Baþladý! Tüm puanlar yenilendi.</color>");
     }
-    public void RestartGame() // 2. BU FONKSÝYONU EKLE
+
+    public void RestartGame()
     {
-        // Þu an açýk olan sahnenin adýný alýr ve onu tekrar yükler
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-
-        // Statik deðiþkenleri manuel temizle (Önemli!)
         UnitController.selectedUnit = null;
-
         Debug.Log("<color=yellow>Oyun Sýfýrlandý!</color>");
     }
 }

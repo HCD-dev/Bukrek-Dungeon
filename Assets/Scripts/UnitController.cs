@@ -4,47 +4,46 @@ using UnityEngine.EventSystems;
 
 public class UnitController : MonoBehaviour
 {
+    private bool isWaitingForText = false;
+    [HideInInspector] public bool isMovementModeActive = false;
+    private EnemyController lastHoveredEnemy;
     public static UnitController selectedUnit;
-
-
 
     [Header("Birim Kimliði")]
     public string unitName;
 
-    [Header("Stat Ayarlarý (Inspector)")]
+    [Header("Stat Ayarlarý")]
     public int maxHealth = 100;
     public int currentHealth;
     public int attackPower = 20;
+    public int dodgeChance = 0; // Dodge statý burada durmalý ama Text referansýna gerek yok
 
     [Space]
-    public int maxMovementPoints = 3; // Toplam hareket hakký
+    public int maxMovementPoints = 3;
     public int currentMovementPoints;
 
     [Space]
-    public int maxActionPoints = 1;   // Saldýrý hakký
+    public int maxActionPoints = 1;
     public int currentActionPoints;
 
     public float moveSpeed = 8f;
 
-    [Header("Grid Ayarlarý (Senin Tile Ölçülerin)")]
-    public float tileWidth = 0.9f;   // Tile Scale X
-    public float tileLength = 0.9f;  // Tile Scale Z
+    [Header("Grid Ayarlarý")]
+    public float stepSize = 10f;
 
-    [Header("UI ve Görsel")]
-    public GameObject selectionRing;
-    public TextMeshProUGUI movementText;
+    [Header("Görsel")]
+    public GameObject selectionRing; // Sadece halka referansýný býraktým
 
     private Vector3 targetPosition;
     private bool isMoving = false;
     [HideInInspector] public bool isSelectingTarget = false;
 
     [Header("Menzil Ayarlarý")]
-    public int attackRange = 1; // Erlik için 1, Mergen için 5 yaparsýn
-    public TextMeshProUGUI rangeStatusText;
-
+    public int attackRange = 1;
     public int hitChance = 85;
-    public int rangeD = 1;
-    
+
+    private TileControl lastHoveredTile;
+
     void Start()
     {
         currentHealth = maxHealth;
@@ -53,7 +52,6 @@ public class UnitController : MonoBehaviour
         targetPosition = transform.position;
 
         if (selectionRing != null) selectionRing.SetActive(false);
-        if (movementText != null) movementText.text = "";
     }
 
     void Update()
@@ -71,49 +69,89 @@ public class UnitController : MonoBehaviour
             }
         }
     }
+
+    // --- Gereksiz UpdateDodgeText ve UpdateMovementText fonksiyonlarýný sildik ---
+
     void HandleHover()
     {
-        if (selectedUnit == this && isSelectingTarget)
+        if (isWaitingForText) return;
+
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit))
         {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit))
+            if (isSelectingTarget && selectedUnit == this)
             {
                 EnemyController enemy = hit.collider.GetComponent<EnemyController>();
                 if (enemy != null)
                 {
-                    float dist = Vector3.Distance(transform.position, enemy.transform.position) / 10f;
+                    if (lastHoveredEnemy != null && lastHoveredEnemy != enemy)
+                        lastHoveredEnemy.ClearRangeText();
+
+                    lastHoveredEnemy = enemy;
+
+                    float dist = Vector3.Distance(transform.position, enemy.transform.position) / stepSize;
                     int distanceInTiles = Mathf.RoundToInt(dist);
 
                     if (distanceInTiles <= attackRange)
                     {
-                        // Buradaki %90 yerine artýk ünitenin kendi hitChance deðerini yazýyoruz
-                        rangeStatusText.text = "<color=green>Menzil Ýçinde</color> Ýsabet Þansý: %" + hitChance;
+                        int finalChance = hitChance - enemy.dodgeChance;
+                        enemy.SetRangeText("<color=green>In Range!</color> HitChance: %" + finalChance);
                     }
                     else
                     {
-                        rangeStatusText.text = "<color=red>Menzil Dýþýnda</color> Uzaklýk: " + distanceInTiles;
+                        enemy.SetRangeText("<color=red>Out of Range!</color> Distance: " + distanceInTiles);
                     }
                     return;
                 }
             }
-        }
-        if (rangeStatusText != null && rangeStatusText.text != "") rangeStatusText.text = "";
-    }
-    void HandleInput()
-    {
-        
-            if (Input.GetMouseButtonDown(0))
+
+            if (selectedUnit == this && !isMoving && isMovementModeActive)
             {
-                if (EventSystem.current.IsPointerOverGameObject()) 
+                TileControl tile = hit.collider.GetComponent<TileControl>();
+                if (tile != null)
                 {
+                    if (lastHoveredTile == tile) return;
+                    if (lastHoveredTile != null) lastHoveredTile.HideRange();
+
+                    lastHoveredTile = tile;
+
+                    float dist = Vector3.Distance(transform.position, tile.transform.position) / stepSize;
+                    int totalSteps = Mathf.RoundToInt(dist);
+
+                    bool canMove = totalSteps <= currentMovementPoints && totalSteps > 0 && !tile.isOccupied;
+                    tile.ShowRange(canMove);
                     return;
                 }
-                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            }
+        }
+        ClearHovers();
+    }
 
+    private void ClearHovers()
+    {
+        if (lastHoveredEnemy != null)
+        {
+            lastHoveredEnemy.ClearRangeText();
+            lastHoveredEnemy = null;
+        }
+
+        if (lastHoveredTile != null)
+        {
+            lastHoveredTile.HideRange();
+            lastHoveredTile = null;
+        }
+    }
+
+    void HandleInput()
+    {
+        if (Input.GetMouseButtonDown(0))
+        {
+            if (EventSystem.current.IsPointerOverGameObject()) return;
+
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                // 1. SALDIRI MODU
-                if (isSelectingTarget)
+                if (isSelectingTarget && selectedUnit == this)
                 {
                     EnemyController enemy = hit.collider.GetComponent<EnemyController>();
                     if (enemy != null && currentActionPoints > 0)
@@ -124,7 +162,6 @@ public class UnitController : MonoBehaviour
                     return;
                 }
 
-                // 2. ÜNÝTE SEÇME
                 UnitController clickedUnit = hit.collider.GetComponent<UnitController>();
                 if (clickedUnit != null)
                 {
@@ -132,38 +169,29 @@ public class UnitController : MonoBehaviour
                     return;
                 }
 
-                // 3. HAREKET (Hesaplamalý)
-                if (selectedUnit == this && currentMovementPoints > 0 && !isMoving)
+                if (selectedUnit == this && currentMovementPoints > 0 && !isMoving && isMovementModeActive)
                 {
                     MoveToTarget(hit.point);
+                    isMovementModeActive = false;
                 }
             }
-        
-            }
+        }
     }
 
     void MoveToTarget(Vector3 worldPosition)
     {
-        float stepSize = 10f;
         float gridX = Mathf.Round(worldPosition.x / stepSize) * stepSize;
         float gridZ = Mathf.Round(worldPosition.z / stepSize) * stepSize;
-
-        // Hedeflenen pozisyonu belirle
         Vector3 finalTarget = new Vector3(gridX, transform.position.y, gridZ);
 
-        // --- DÜZELTME: KENDÝNE ÇARPMAMA KONTROLÜ ---
-        // Hedef noktada baþka collider var mý bakýyoruz.
         Collider[] colliders = Physics.OverlapSphere(finalTarget, 1f);
         foreach (var col in colliders)
         {
-            // Eðer çarptýðýn þey bu ünitenin kendisi DEÐÝLSE ve bir karakterse
             if (col.gameObject != this.gameObject && (col.GetComponent<UnitController>() || col.GetComponent<EnemyController>()))
             {
-                Debug.Log("<color=red>Hata: Tile dolu! Engel: " + col.gameObject.name + "</color>");
                 return;
             }
         }
-        // ------------------------------------------
 
         float distanceX = Mathf.Abs(finalTarget.x - transform.position.x) / stepSize;
         float distanceZ = Mathf.Abs(finalTarget.z - transform.position.z) / stepSize;
@@ -171,25 +199,17 @@ public class UnitController : MonoBehaviour
 
         if (totalSteps > 0 && totalSteps <= currentMovementPoints)
         {
+            if (lastHoveredTile != null) lastHoveredTile.HideRange();
+
             targetPosition = finalTarget;
             isMoving = true;
             currentMovementPoints -= totalSteps;
 
-            UpdateMovementText();
-            if (UIManager.Instance != null)
-                UIManager.Instance.ShowUnitInfo(this);
-
-            Debug.Log("<color=green>Hareket Onaylandý!</color>");
-        }
-        else if (totalSteps == 0)
-        {
-            Debug.Log("Zaten buradasýn.");
-        }
-        else
-        {
-            Debug.Log("<color=red>Menzil Dýþý!</color> Gereken: " + totalSteps + " Mevcut: " + currentMovementPoints);
+            // Bilgileri direkt UIManager üzerinden güncelliyoruz
+            if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
         }
     }
+
     public void SelectUnit(UnitController unit)
     {
         UnitController[] allUnits = Object.FindObjectsByType<UnitController>(FindObjectsSortMode.None);
@@ -198,70 +218,58 @@ public class UnitController : MonoBehaviour
         selectedUnit = unit;
         if (unit.selectionRing != null) unit.selectionRing.SetActive(true);
 
-        UIManager.Instance.ShowUnitInfo(unit);
-        unit.UpdateMovementText();
+        if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(unit);
     }
 
     public void DeselectUnit()
     {
+        isSelectingTarget = false;
+        isMovementModeActive = false;
         if (selectionRing != null) selectionRing.SetActive(false);
-        if (movementText != null) movementText.text = "";
-    }
-
-    public void UpdateMovementText()
-    {
-        if (movementText != null && selectedUnit == this)
-            movementText.text = "MP: " + currentMovementPoints;
+        ClearHovers();
     }
 
     public void PerformAttack(EnemyController target)
     {
-        float dist = Vector3.Distance(transform.position, target.transform.position) / 10f;
+        float dist = Vector3.Distance(transform.position, target.transform.position) / stepSize;
         int distanceInTiles = Mathf.RoundToInt(dist);
 
         if (distanceInTiles <= attackRange)
         {
-            currentActionPoints--; // Saldýrý giriþimi yapýldýðý için puan düþer
+            isWaitingForText = true;
+            currentActionPoints--;
+            int finalHitChance = hitChance - target.dodgeChance;
+            int randomRoll = Random.Range(1, 101);
 
-            // --- ÝSABET KONTROLÜ (Zar Atma) ---
-            int randomRoll = Random.Range(1, 101); // 1 ile 100 arasý sayý tut
-
-            if (randomRoll <= hitChance)
+            if (randomRoll <= finalHitChance)
             {
-                // ÝSABET!
                 target.TakeDamage(attackPower);
-                Debug.Log("<color=green>ÝSABET!</color> " + unitName + " vurdu. Zar: " + randomRoll + " / " + hitChance);
+                target.SetRangeText("<size=120%><color=yellow>HIT!</color></size>");
             }
             else
             {
-                // ISKALADI!
-                Debug.Log("<color=orange>ISKALADI!</color> " + unitName + " hedefi tutturamadý. Zar: " + randomRoll + " / " + hitChance);
+                target.SetRangeText("<size=120%><color=red>MISS!</color></size>");
             }
 
-            UIManager.Instance.ShowUnitInfo(this);
-            UpdateMovementText();
-        }
-        else
-        {
-            Debug.Log("Çok uzak! Saldýramazsýn.");
+            StartCoroutine(ClearTextAfterDelay(target, 1.5f));
+
+            if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
         }
     }
 
-    public void StartTargetSelection()
-{
-    if (currentActionPoints > 0)
+    private System.Collections.IEnumerator ClearTextAfterDelay(EnemyController target, float delay)
     {
-        isSelectingTarget = true;
-        // Ýstersen burada imleci deðiþtirebilirsin
-        Debug.Log("Saldýrý Modu Aktif. Bir düþmana týkla!");
+        yield return new WaitForSeconds(delay);
+        if (target != null) target.ClearRangeText();
+        isWaitingForText = false;
     }
-}
 
     public void ResetPoints()
     {
         currentMovementPoints = maxMovementPoints;
         currentActionPoints = maxActionPoints;
         isSelectingTarget = false;
+        isMovementModeActive = false;
         isMoving = false;
     }
 }
