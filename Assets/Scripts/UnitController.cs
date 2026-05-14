@@ -1,6 +1,8 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.EventSystems;
+using System.Collections;
+using System.Collections.Generic;
 
 public class UnitController : MonoBehaviour
 {
@@ -16,7 +18,7 @@ public class UnitController : MonoBehaviour
     public int maxHealth = 100;
     public int currentHealth;
     public int attackPower = 20;
-    public int dodgeChance = 0; // Dodge statý burada durmalý ama Text referansýna gerek yok
+    public int dodgeChance = 0;
 
     [Space]
     public int maxMovementPoints = 3;
@@ -32,7 +34,7 @@ public class UnitController : MonoBehaviour
     public float stepSize = 10f;
 
     [Header("Görsel")]
-    public GameObject selectionRing; // Sadece halka referansýný býraktým
+    public GameObject selectionRing;
 
     private Vector3 targetPosition;
     private bool isMoving = false;
@@ -43,7 +45,6 @@ public class UnitController : MonoBehaviour
     public int hitChance = 85;
 
     private TileControl lastHoveredTile;
-    
     private Animator animator;
 
     void Start()
@@ -55,16 +56,17 @@ public class UnitController : MonoBehaviour
         targetPosition = transform.position;
 
         if (selectionRing != null) selectionRing.SetActive(false);
+
+        SetTileOccupied(transform.position, true);
     }
 
     void Update()
     {
         if (TurnManager.Instance.currentState != TurnManager.TurnState.PlayerTurn) return;
+
         if (animator != null)
-        {
-            // isMoving deðiþkenini kullanarak animasyonu deðiþtir
             animator.SetBool("isMoving", isMoving);
-        }
+
         HandleInput();
         HandleHover();
 
@@ -75,11 +77,83 @@ public class UnitController : MonoBehaviour
             {
                 transform.position = targetPosition;
                 isMoving = false;
+                SetTileOccupied(transform.position, true);
             }
         }
     }
 
-    // --- Gereksiz UpdateDodgeText ve UpdateMovementText fonksiyonlarýný sildik ---
+    public LayerMask gridLayer;
+
+    private void SetTileOccupied(Vector3 pos, bool occupied)
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(pos + Vector3.up * 5f, Vector3.down, out hit, 10f, gridLayer))
+        {
+            TileControl tile = hit.collider.GetComponent<TileControl>();
+            if (tile != null)
+            {
+                tile.isOccupied = occupied;
+            }
+        }
+    }
+
+    private TileControl GetTileAtPosition(Vector3 pos)
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(pos + Vector3.up * 5f, Vector3.down, out hit, 10f, gridLayer))
+        {
+            return hit.collider.GetComponent<TileControl>();
+        }
+        return null;
+    }
+
+    bool IsPathClear(Vector3 start, Vector3 end)
+    {
+        Vector3 gridStart = new Vector3(
+            Mathf.Round(start.x / stepSize) * stepSize,
+            start.y,
+            Mathf.Round(start.z / stepSize) * stepSize
+        );
+
+        Vector3 gridEnd = new Vector3(
+            Mathf.Round(end.x / stepSize) * stepSize,
+            start.y,
+            Mathf.Round(end.z / stepSize) * stepSize
+        );
+
+        int startGridX = Mathf.RoundToInt(gridStart.x / stepSize);
+        int startGridZ = Mathf.RoundToInt(gridStart.z / stepSize);
+        int endGridX = Mathf.RoundToInt(gridEnd.x / stepSize);
+        int endGridZ = Mathf.RoundToInt(gridEnd.z / stepSize);
+
+        int stepX = startGridX == endGridX ? 0 : (endGridX > startGridX ? 1 : -1);
+        int stepZ = startGridZ == endGridZ ? 0 : (endGridZ > startGridZ ? 1 : -1);
+
+        int currentX = startGridX;
+        int currentZ = startGridZ;
+
+        while (currentX != endGridX || currentZ != endGridZ)
+        {
+            // Hedef hariç tüm tile'larý kontrol et
+            if (currentX != endGridX) currentX += stepX;
+            if (currentZ != endGridZ) currentZ += stepZ;
+
+            Vector3 checkPos = new Vector3(currentX * stepSize, start.y, currentZ * stepSize);
+            TileControl tile = GetTileAtPosition(checkPos);
+
+            if (tile != null && tile.isOccupied && !(currentX == endGridX && currentZ == endGridZ))
+            {
+                return false;
+            }
+        }
+
+        // Hedef tile kontrol
+        TileControl targetTile = GetTileAtPosition(gridEnd);
+        if (targetTile != null && targetTile.isOccupied)
+            return false;
+
+        return true;
+    }
 
     void HandleHover()
     {
@@ -97,7 +171,6 @@ public class UnitController : MonoBehaviour
                         lastHoveredEnemy.ClearRangeText();
 
                     lastHoveredEnemy = enemy;
-
                     float dist = Vector3.Distance(transform.position, enemy.transform.position) / stepSize;
                     int distanceInTiles = Mathf.RoundToInt(dist);
 
@@ -123,11 +196,10 @@ public class UnitController : MonoBehaviour
                     if (lastHoveredTile != null) lastHoveredTile.HideRange();
 
                     lastHoveredTile = tile;
-
                     float dist = Vector3.Distance(transform.position, tile.transform.position) / stepSize;
                     int totalSteps = Mathf.RoundToInt(dist);
 
-                    bool canMove = totalSteps <= currentMovementPoints && totalSteps > 0 && !tile.isOccupied;
+                    bool canMove = totalSteps <= currentMovementPoints && totalSteps > 0 && !tile.isOccupied && IsPathClear(transform.position, tile.transform.position);
                     tile.ShowRange(canMove);
                     return;
                 }
@@ -138,50 +210,35 @@ public class UnitController : MonoBehaviour
 
     private void ClearHovers()
     {
-        if (lastHoveredEnemy != null)
-        {
-            lastHoveredEnemy.ClearRangeText();
-            lastHoveredEnemy = null;
-        }
-
-        if (lastHoveredTile != null)
-        {
-            lastHoveredTile.HideRange();
-            lastHoveredTile = null;
-        }
+        if (lastHoveredEnemy != null) { lastHoveredEnemy.ClearRangeText(); lastHoveredEnemy = null; }
+        if (lastHoveredTile != null) { lastHoveredTile.HideRange(); lastHoveredTile = null; }
     }
 
     void HandleInput()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject())
         {
-            if (EventSystem.current.IsPointerOverGameObject()) return;
-
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                if (isSelectingTarget && selectedUnit == this)
+                if (selectedUnit != this)
                 {
-                    EnemyController enemy = hit.collider.GetComponent<EnemyController>();
-                    if (enemy != null && currentActionPoints > 0)
+                    UnitController clickedUnit = hit.collider.GetComponent<UnitController>();
+                    if (clickedUnit != null) SelectUnit(clickedUnit);
+                    return;
+                }
+
+                EnemyController enemy = hit.collider.GetComponent<EnemyController>();
+                if (enemy != null && isSelectingTarget)
+                {
+                    PerformAttack(enemy);
+                }
+                else if (hit.collider.GetComponent<TileControl>() && isMovementModeActive)
+                {
+                    if (IsPathClear(transform.position, hit.collider.transform.position))
                     {
-                        PerformAttack(enemy);
+                        MoveToTarget(hit.collider.transform.position);
                     }
-                    isSelectingTarget = false;
-                    return;
-                }
-
-                UnitController clickedUnit = hit.collider.GetComponent<UnitController>();
-                if (clickedUnit != null)
-                {
-                    SelectUnit(clickedUnit);
-                    return;
-                }
-
-                if (selectedUnit == this && currentMovementPoints > 0 && !isMoving && isMovementModeActive)
-                {
-                    MoveToTarget(hit.point);
-                    isMovementModeActive = false;
                 }
             }
         }
@@ -193,28 +250,19 @@ public class UnitController : MonoBehaviour
         float gridZ = Mathf.Round(worldPosition.z / stepSize) * stepSize;
         Vector3 finalTarget = new Vector3(gridX, transform.position.y, gridZ);
 
-        Collider[] colliders = Physics.OverlapSphere(finalTarget, 1f);
-        foreach (var col in colliders)
-        {
-            if (col.gameObject != this.gameObject && (col.GetComponent<UnitController>() || col.GetComponent<EnemyController>()))
-            {
-                return;
-            }
-        }
-
         float distanceX = Mathf.Abs(finalTarget.x - transform.position.x) / stepSize;
         float distanceZ = Mathf.Abs(finalTarget.z - transform.position.z) / stepSize;
         int totalSteps = Mathf.RoundToInt(distanceX + distanceZ);
 
         if (totalSteps > 0 && totalSteps <= currentMovementPoints)
         {
-            if (lastHoveredTile != null) lastHoveredTile.HideRange();
+            SetTileOccupied(transform.position, false);
 
+            if (lastHoveredTile != null) lastHoveredTile.HideRange();
             targetPosition = finalTarget;
             isMoving = true;
             currentMovementPoints -= totalSteps;
 
-            // Bilgileri direkt UIManager üzerinden güncelliyoruz
             if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
         }
     }
@@ -223,10 +271,8 @@ public class UnitController : MonoBehaviour
     {
         UnitController[] allUnits = Object.FindObjectsByType<UnitController>(FindObjectsSortMode.None);
         foreach (UnitController u in allUnits) u.DeselectUnit();
-
         selectedUnit = unit;
         if (unit.selectionRing != null) unit.selectionRing.SetActive(true);
-
         if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(unit);
     }
 
@@ -240,6 +286,8 @@ public class UnitController : MonoBehaviour
 
     public void PerformAttack(EnemyController target)
     {
+        if (currentActionPoints <= 0) return;
+
         float dist = Vector3.Distance(transform.position, target.transform.position) / stepSize;
         int distanceInTiles = Mathf.RoundToInt(dist);
 
@@ -259,14 +307,12 @@ public class UnitController : MonoBehaviour
             {
                 target.SetRangeText("<size=120%><color=red>MISS!</color></size>");
             }
-
             StartCoroutine(ClearTextAfterDelay(target, 1.5f));
-
             if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
         }
     }
 
-    private System.Collections.IEnumerator ClearTextAfterDelay(EnemyController target, float delay)
+    private IEnumerator ClearTextAfterDelay(EnemyController target, float delay)
     {
         yield return new WaitForSeconds(delay);
         if (target != null) target.ClearRangeText();
@@ -281,22 +327,18 @@ public class UnitController : MonoBehaviour
         isMovementModeActive = false;
         isMoving = false;
     }
+
     public void TakeDamage(int damageAmount)
     {
         currentHealth -= damageAmount;
         currentHealth = Mathf.Max(currentHealth, 0);
-
-        Debug.Log(unitName + " hasar aldý! Kalan HP: " + currentHealth);
-
-        // Paneli güncelle
         if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
-
-        if (currentHealth <= 0)
-        {
-            Debug.Log(unitName + " yenildi!");
-            // Buraya ölüm animasyonu veya sahneyi yeniden baþlatma gelebilir
-        }
+        if (currentHealth <= 0) Die();
     }
 
-
+    void Die()
+    {
+        SetTileOccupied(transform.position, false);
+        Destroy(gameObject);
+    }
 }

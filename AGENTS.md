@@ -2,7 +2,7 @@
 - Project name: Bukrek Dungeon
 - Unity version: Unity 6000.3.8f1
 - Active game object:
-  - Name: ErlikCapsule
+  - Name: Mergen
   - Tag: Player
-  - Layer: Unit
+  - Layer: Default
 <!-- UNITY CODE ASSIST INSTRUCTIONS END -->
