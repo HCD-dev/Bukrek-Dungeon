@@ -43,9 +43,12 @@ public class UnitController : MonoBehaviour
     public int hitChance = 85;
 
     private TileControl lastHoveredTile;
+    
+    private Animator animator;
 
     void Start()
     {
+        animator = GetComponentInChildren<Animator>();
         currentHealth = maxHealth;
         currentMovementPoints = maxMovementPoints;
         currentActionPoints = maxActionPoints;
@@ -56,6 +59,11 @@ public class UnitController : MonoBehaviour
 
     void Update()
     {
+        if (animator != null)
+        {
+            // isMoving deðiþkenini kullanarak animasyonu deðiþtir
+            animator.SetBool("isMoving", isMoving);
+        }
         HandleInput();
         HandleHover();
 
@@ -77,7 +85,7 @@ public class UnitController : MonoBehaviour
         if (isWaitingForText) return;
 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(ray, out RaycastHit hit))
+        if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
         {
             if (isSelectingTarget && selectedUnit == this)
             {
