@@ -59,6 +59,7 @@ public class UnitController : MonoBehaviour
 
     void Update()
     {
+        if (TurnManager.Instance.currentState != TurnManager.TurnState.PlayerTurn) return;
         if (animator != null)
         {
             // isMoving deðiþkenini kullanarak animasyonu deðiþtir
@@ -280,4 +281,22 @@ public class UnitController : MonoBehaviour
         isMovementModeActive = false;
         isMoving = false;
     }
+    public void TakeDamage(int damageAmount)
+    {
+        currentHealth -= damageAmount;
+        currentHealth = Mathf.Max(currentHealth, 0);
+
+        Debug.Log(unitName + " hasar aldý! Kalan HP: " + currentHealth);
+
+        // Paneli güncelle
+        if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
+
+        if (currentHealth <= 0)
+        {
+            Debug.Log(unitName + " yenildi!");
+            // Buraya ölüm animasyonu veya sahneyi yeniden baþlatma gelebilir
+        }
+    }
+
+
 }

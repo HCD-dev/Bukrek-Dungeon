@@ -133,6 +133,7 @@ public class UIManager : MonoBehaviour
 
     public void EndTurn()
     {
+        // 1. Oyuncu birimlerini sýfýrla
         UnitController[] allUnits = Object.FindObjectsByType<UnitController>(FindObjectsSortMode.None);
         foreach (UnitController unit in allUnits)
         {
@@ -143,7 +144,14 @@ public class UIManager : MonoBehaviour
         UnitController.selectedUnit = null;
         ClearUI();
 
-        Debug.Log("<color=cyan>Yeni Tur Baþladý! Tüm puanlar yenilendi.</color>");
+        // 2. TURN MANAGER'A HABER VER (Eklendi)
+        // Eðer sahnede TurnManager varsa düþman turunu baþlatýr
+        if (TurnManager.Instance != null)
+        {
+            TurnManager.Instance.OnEndTurnButtonPressed();
+        }
+
+        Debug.Log("<color=cyan>Tur Sonlandýrýldý! Düþman sýrasý kontrol ediliyor.</color>");
     }
 
     public void RestartGame()
