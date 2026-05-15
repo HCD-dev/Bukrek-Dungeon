@@ -378,8 +378,9 @@ MonoBehaviour:
   dodgeChance: 10
   moveRange: 2
   moveSpeed: 40
-  hpText: {fileID: 1325644298716264742}
-  enemyRangeText: {fileID: 4945715704415033945}
+  hpDisplay: {fileID: 1325644298716264742}
+  feedbackText: {fileID: 4945715704415033945}
+  stepSize: 10
   gridLayer:
     serializedVersion: 2
     m_Bits: 64

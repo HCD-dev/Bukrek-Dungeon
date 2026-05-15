@@ -41,7 +41,7 @@ public class TurnManager : MonoBehaviour
         {
             if (enemy == null) continue;
 
-            enemy.ExecuteTurn();
+            enemy.BeginTurn();
             yield return new WaitForSeconds(delayBetweenEnemies);
         }
 

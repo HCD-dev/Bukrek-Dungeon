@@ -20,7 +20,7 @@ public class TileControl : MonoBehaviour
         if (redOverlay != null) redOverlay.SetActive(false);
     }
 
-    // --- Movement Range Fonksiyonlarý ---
+   
 
     public void ShowRange(bool canMove)
     {

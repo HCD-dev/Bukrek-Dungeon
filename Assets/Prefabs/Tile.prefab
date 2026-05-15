@@ -109,7 +109,6 @@ MonoBehaviour:
   isOccupied: 0
   greenOverlay: {fileID: 8400156953060273062}
   redOverlay: {fileID: 9105922690613238167}
-  overlayObject: {fileID: 0}
   occupantUnit: {fileID: 0}
 --- !u!65 &1910709322604068249
 BoxCollider:
@@ -161,7 +160,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0.2, z: 0}
-  m_LocalScale: {x: 0.8, y: 0.8, z: 0.8}
+  m_LocalScale: {x: 0.8, y: 1, z: 0.8}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5102594135995186947}

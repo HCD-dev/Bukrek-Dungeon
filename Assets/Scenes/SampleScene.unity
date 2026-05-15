@@ -215,18 +215,18 @@ RectTransform:
   m_Children:
   - {fileID: 1531376465}
   - {fileID: 1563666334}
+  - {fileID: 1665111279}
+  - {fileID: 1164045222}
   - {fileID: 2146497628}
   - {fileID: 1968595680}
-  - {fileID: 2013550730}
-  - {fileID: 1164045222}
-  - {fileID: 1665111279}
+  - {fileID: 568342072}
+  - {fileID: 684374571}
+  - {fileID: 1425440893}
   - {fileID: 607018029}
   - {fileID: 1124137566}
-  - {fileID: 684374571}
-  - {fileID: 568342072}
+  - {fileID: 2013550730}
   - {fileID: 1827350601}
   - {fileID: 1775829320}
-  - {fileID: 1425440893}
   m_Father: {fileID: 1128224566}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -416,13 +416,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e32fb5401494724c82fbaa1de707148, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraControl
-  startPosition: {x: 200, y: 40, z: 70}
-  moveSpeed: 50
+  defaultPos: {x: 200, y: 40, z: 70}
+  speed: 40
+  zoomSensitivity: 600
   minX: 150
   maxX: 250
   minZ: 40
   maxZ: 100
-  scrollSpeed: 500
   minY: 10
   maxY: 50
 --- !u!1 &364610546
@@ -469,7 +469,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ab9118b41ddab1e47b1579ced4cc52f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurnManager
-  currentState: 0
+  delayBetweenEnemies: 1.5
 --- !u!1001 &400639561
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1210,13 +1210,13 @@ MonoBehaviour:
   currentActionPoints: 0
   moveSpeed: 40
   stepSize: 10
+  gridLayer:
+    serializedVersion: 2
+    m_Bits: 64
   selectionRing: {fileID: 1611491390}
   isSelectingTarget: 0
   attackRange: 1
   hitChance: 80
-  gridLayer:
-    serializedVersion: 2
-    m_Bits: 0
 --- !u!1 &684374570
 GameObject:
   m_ObjectHideFlags: 0
@@ -1622,13 +1622,13 @@ MonoBehaviour:
   currentActionPoints: 0
   moveSpeed: 40
   stepSize: 10
+  gridLayer:
+    serializedVersion: 2
+    m_Bits: 64
   selectionRing: {fileID: 1961533236}
   isSelectingTarget: 0
   attackRange: 5
   hitChance: 95
-  gridLayer:
-    serializedVersion: 2
-    m_Bits: 0
 --- !u!1 &1033611245
 GameObject:
   m_ObjectHideFlags: 0
@@ -2131,7 +2131,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1425440892}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 3, y: 3, z: 3}
   m_ConstrainProportionsScale: 0
@@ -2140,7 +2140,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 144, y: -567}
+  m_AnchoredPosition: {x: 143.99994, y: -566.9998}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1425440894
@@ -2941,17 +2941,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9de2e9d70d9c4ab4f821b61d47dbdc0d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIManager
-  nameText: {fileID: 1563666335}
-  actionText: {fileID: 1665111280}
-  movementText: {fileID: 1164045223}
-  healthText: {fileID: 2146497629}
-  attackText: {fileID: 1968595681}
-  rangeText: {fileID: 568342073}
-  hitChanceText: {fileID: 684374572}
-  dodgeText: {fileID: 1425440894}
-  unitPortrait: {fileID: 2013550731}
-  attackActionImage: {fileID: 1827350602}
-  movementActionImage: {fileID: 1775829322}
+  nameLabel: {fileID: 1563666335}
+  actionPointsLabel: {fileID: 1665111280}
+  movePointsLabel: {fileID: 1164045223}
+  healthLabel: {fileID: 2146497629}
+  damageLabel: {fileID: 1968595681}
+  rangeLabel: {fileID: 568342073}
+  hitChanceLabel: {fileID: 684374572}
+  dodgeLabel: {fileID: 1425440894}
+  portraitDisplay: {fileID: 2013550731}
+  attackIconSlot: {fileID: 1827350602}
+  movementIconSlot: {fileID: 1775829322}
   erlikPortrait: {fileID: 21300000, guid: 0fd8f1c8b82b15c4aa39a168af070e3b, type: 3}
   mergenPortrait: {fileID: 21300000, guid: e91dccb888034654087ee612d1414f7f, type: 3}
   meleeIcon: {fileID: 21300000, guid: bd7d3da75149b80449519c1750db874b, type: 3}
