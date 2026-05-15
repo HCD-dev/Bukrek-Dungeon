@@ -4,7 +4,7 @@ using System.Collections;
 
 public class EnemyController : MonoBehaviour
 {
-    [Header("Düþman Ayarlarý")]
+    [Header("Base Stats")]
     public string enemyName = "Karakoncolos";
     public int maxHealth = 100;
     public int currentHealth;
@@ -14,49 +14,50 @@ public class EnemyController : MonoBehaviour
     public int dodgeChance = 10;
     public int moveRange = 2;
 
-    [Header("Hareket Ayarlarý")]
+    [Header("Movement")]
     public float moveSpeed = 8f;
     private bool isMoving = false;
-    private Vector3 targetMovePosition;
-    private Vector3 positionBeforeMove;
+    private Vector3 destinationPoint;
+    private Vector3 lastPosition;
 
-    [Header("UI Elemanlarý")]
-    public TextMeshProUGUI hpText;
-    public TextMeshProUGUI enemyRangeText;
+    [Header("Interface")]
+    public TextMeshProUGUI hpDisplay;
+    public TextMeshProUGUI feedbackText;
 
-    private UnitController playerUnit;
+    private UnitController playerRef;
     public float stepSize = 10f;
 
-    [Header("Sistem Ayarlarý")]
+    [Header("Technical")]
     public LayerMask gridLayer;
-                
+
     void Start()
     {
         currentHealth = maxHealth;
-        playerUnit = Object.FindAnyObjectByType<UnitController>();
-        if (enemyRangeText != null) enemyRangeText.text = "";
-        UpdateHPUI();
+        playerRef = Object.FindAnyObjectByType<UnitController>();
 
-        SetTileOccupied(transform.position, true);
+        if (feedbackText != null) feedbackText.text = string.Empty;
+        RefreshStatusUI();
+
+        UpdateGridStatus(transform.position, true);
     }
 
     void Update()
     {
         if (isMoving)
         {
-            transform.position = Vector3.MoveTowards(transform.position, targetMovePosition, moveSpeed * Time.deltaTime);
-            if (Vector3.Distance(transform.position, targetMovePosition) < 0.01f)
+            transform.position = Vector3.MoveTowards(transform.position, destinationPoint, moveSpeed * Time.deltaTime);
+            if (Vector3.Distance(transform.position, destinationPoint) < 0.01f)
             {
-                transform.position = targetMovePosition;
+                transform.position = destinationPoint;
                 isMoving = false;
 
-                SetTileOccupied(positionBeforeMove, false);
-                SetTileOccupied(transform.position, true);
+                UpdateGridStatus(lastPosition, false);
+                UpdateGridStatus(transform.position, true);
             }
         }
     }
 
-    private void SetTileOccupied(Vector3 pos, bool occupied)
+    private void UpdateGridStatus(Vector3 pos, bool occupied)
     {
         RaycastHit hit;
         if (Physics.Raycast(pos + Vector3.up * 5f, Vector3.down, out hit, 10f, gridLayer))
@@ -66,7 +67,7 @@ public class EnemyController : MonoBehaviour
         }
     }
 
-    private TileControl GetTileAtPosition(Vector3 pos)
+    private TileControl GetTileAt(Vector3 pos)
     {
         RaycastHit hit;
         if (Physics.Raycast(pos + Vector3.up * 5f, Vector3.down, out hit, 10f, gridLayer))
@@ -76,183 +77,164 @@ public class EnemyController : MonoBehaviour
         return null;
     }
 
-    private bool IsTileOccupiedByUnit(Vector3 pos)
+    private bool IsSpaceOccupied(Vector3 pos)
     {
-        float checkRadius = stepSize * 0.4f;
-        Vector3 center = new Vector3(pos.x, pos.y + 0.5f, pos.z);
-        Collider[] cols = Physics.OverlapSphere(center, checkRadius);
-        foreach (var c in cols)
+        float radius = stepSize * 0.4f;
+        Collider[] hits = Physics.OverlapSphere(new Vector3(pos.x, pos.y + 0.5f, pos.z), radius);
+        foreach (var col in hits)
         {
-            if (c.GetComponent<UnitController>() != null || c.GetComponent<EnemyController>() != null)
+            if (col.GetComponent<UnitController>() != null || col.GetComponent<EnemyController>() != null)
                 return true;
         }
         return false;
     }
 
-    bool IsPathClear(Vector3 start, Vector3 end)
+    bool IsNavigationPossible(Vector3 start, Vector3 end)
     {
-        Vector3 gridStart = new Vector3(
-            Mathf.Round(start.x / stepSize) * stepSize,
-            start.y,
-            Mathf.Round(start.z / stepSize) * stepSize
-        );
+        int startX = Mathf.RoundToInt(start.x / stepSize);
+        int startZ = Mathf.RoundToInt(start.z / stepSize);
+        int endX = Mathf.RoundToInt(end.x / stepSize);
+        int endZ = Mathf.RoundToInt(end.z / stepSize);
 
-        Vector3 gridEnd = new Vector3(
-            Mathf.Round(end.x / stepSize) * stepSize,
-            start.y,
-            Mathf.Round(end.z / stepSize) * stepSize
-        );
+        int stepX = (endX == startX) ? 0 : (endX > startX ? 1 : -1);
+        int stepZ = (endZ == startZ) ? 0 : (endZ > startZ ? 1 : -1);
 
-        int startGridX = Mathf.RoundToInt(gridStart.x / stepSize);
-        int startGridZ = Mathf.RoundToInt(gridStart.z / stepSize);
-        int endGridX = Mathf.RoundToInt(gridEnd.x / stepSize);
-        int endGridZ = Mathf.RoundToInt(gridEnd.z / stepSize);
+        int currX = startX;
+        int currZ = startZ;
 
-        int stepX = startGridX == endGridX ? 0 : (endGridX > startGridX ? 1 : -1);
-        int stepZ = startGridZ == endGridZ ? 0 : (endGridZ > startGridZ ? 1 : -1);
-
-        int currentX = startGridX;
-        int currentZ = startGridZ;
-
-        while (currentX != endGridX || currentZ != endGridZ)
+        while (currX != endX || currZ != endZ)
         {
-            if (currentX != endGridX) currentX += stepX;
-            if (currentZ != endGridZ) currentZ += stepZ;
+            if (currX != endX) currX += stepX;
+            if (currZ != endZ) currZ += stepZ;
 
-            // Hedef kareyi atla; hedef ayrýca kontrol edilecek
-            if (currentX == endGridX && currentZ == endGridZ) break;
+            if (currX == endX && currZ == endZ) break;
 
-            Vector3 checkPos = new Vector3(currentX * stepSize, start.y, currentZ * stepSize);
-            TileControl tile = GetTileAtPosition(checkPos);
-            if (tile != null && tile.isOccupied) return false;
-            if (IsTileOccupiedByUnit(checkPos)) return false;
+            Vector3 checkPos = new Vector3(currX * stepSize, start.y, currZ * stepSize);
+            TileControl tile = GetTileAt(checkPos);
+            if ((tile != null && tile.isOccupied) || IsSpaceOccupied(checkPos)) return false;
         }
 
-        TileControl targetTile = GetTileAtPosition(gridEnd);
-        if (targetTile != null && targetTile.isOccupied) return false;
-        if (IsTileOccupiedByUnit(gridEnd)) return false;
-
-        return true;
+        TileControl targetTile = GetTileAt(end);
+        return targetTile != null && !targetTile.isOccupied && !IsSpaceOccupied(end);
     }
 
-    public void ExecuteTurn()
+    public void BeginTurn()
     {
-        StartCoroutine(AIActionRoutine());
+        StartCoroutine(ProcessAIBehavior());
     }
 
-    private IEnumerator AIActionRoutine()
+    private IEnumerator ProcessAIBehavior()
     {
-        yield return new WaitForSeconds(0.5f);
-        if (playerUnit == null) yield break;
+        yield return new WaitForSeconds(0.6f);
+        if (playerRef == null) yield break;
 
-        float distance = Vector3.Distance(transform.position, playerUnit.transform.position) / stepSize;
-        if (Mathf.RoundToInt(distance) <= attackRange)
+        float dist = Vector3.Distance(transform.position, playerRef.transform.position) / stepSize;
+
+        if (Mathf.RoundToInt(dist) <= attackRange)
         {
-            AttackPlayer();
+            PerformStrike();
         }
         else
         {
-            MoveTowardsPlayer();
+            CalculateMovement();
             yield return new WaitUntil(() => !isMoving);
 
-            yield return new WaitForSeconds(0.5f);
-            distance = Vector3.Distance(transform.position, playerUnit.transform.position) / stepSize;
-            if (Mathf.RoundToInt(distance) <= attackRange) AttackPlayer();
+            yield return new WaitForSeconds(0.4f);
+            dist = Vector3.Distance(transform.position, playerRef.transform.position) / stepSize;
+            if (Mathf.RoundToInt(dist) <= attackRange) PerformStrike();
         }
     }
 
-    private void MoveTowardsPlayer()
+    private void CalculateMovement()
     {
-        if (playerUnit == null) return;
+        if (playerRef == null) return;
 
-        Vector3 direction = (playerUnit.transform.position - transform.position).normalized;
-        Vector3 rawTargetPos = transform.position + direction * (moveRange * stepSize);
+        Vector3 direction = (playerRef.transform.position - transform.position).normalized;
+        Vector3 targetCoord = transform.position + direction * (moveRange * stepSize);
 
-        float targetX = Mathf.Round(rawTargetPos.x / stepSize) * stepSize;
-        float targetZ = Mathf.Round(rawTargetPos.z / stepSize) * stepSize;
-        Vector3 desiredTarget = new Vector3(targetX, transform.position.y, targetZ);
+        float snapX = Mathf.Round(targetCoord.x / stepSize) * stepSize;
+        float snapZ = Mathf.Round(targetCoord.z / stepSize) * stepSize;
+        Vector3 idealSpot = new Vector3(snapX, transform.position.y, snapZ);
 
-        // Eðer doðrudan hedef doluysa ya da hedefe yol kapalýysa alternatif yakýn kare ara
-        if (!IsTileOccupiedByUnit(desiredTarget) && IsPathClear(transform.position, desiredTarget))
+        if (IsNavigationPossible(transform.position, idealSpot))
         {
-            positionBeforeMove = transform.position;
-            targetMovePosition = desiredTarget;
-            isMoving = true;
+            ApplyMove(idealSpot);
             return;
         }
 
-        // Alternatif arama: moveRange içinde en yakýn uygun kareyi bul
-        Vector3 bestCandidate = transform.position;
-        float bestDistToPlayer = float.MaxValue;
-        int range = Mathf.Max(1, moveRange);
+        FindAlternativeSpot();
+    }
 
-        for (int dx = -range; dx <= range; dx++)
+    private void FindAlternativeSpot()
+    {
+        Vector3 bestSpot = transform.position;
+        float minDistance = float.MaxValue;
+        int searchRange = Mathf.Max(1, moveRange);
+
+        for (int x = -searchRange; x <= searchRange; x++)
         {
-            for (int dz = -range; dz <= range; dz++)
+            for (int z = -searchRange; z <= searchRange; z++)
             {
-                int chebyshev = Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dz));
-                if (chebyshev == 0 || chebyshev > range) continue;
+                if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) > searchRange) continue;
 
-                Vector3 cand = new Vector3(
-                    Mathf.Round((transform.position.x + dx * stepSize) / stepSize) * stepSize,
+                Vector3 candidate = new Vector3(
+                    Mathf.Round((transform.position.x + x * stepSize) / stepSize) * stepSize,
                     transform.position.y,
-                    Mathf.Round((transform.position.z + dz * stepSize) / stepSize) * stepSize
+                    Mathf.Round((transform.position.z + z * stepSize) / stepSize) * stepSize
                 );
 
-                if (IsTileOccupiedByUnit(cand)) continue;
-                if (!IsPathClear(transform.position, cand)) continue;
+                if (candidate == transform.position) continue;
+                if (!IsNavigationPossible(transform.position, candidate)) continue;
 
-                float distToPlayer = Vector3.Distance(cand, playerUnit.transform.position);
-                if (distToPlayer < bestDistToPlayer)
+                float distToTarget = Vector3.Distance(candidate, playerRef.transform.position);
+                if (distToTarget < minDistance)
                 {
-                    bestDistToPlayer = distToPlayer;
-                    bestCandidate = cand;
+                    minDistance = distToTarget;
+                    bestSpot = candidate;
                 }
             }
         }
 
-        if (bestDistToPlayer < float.MaxValue && bestCandidate != transform.position)
-        {
-            positionBeforeMove = transform.position;
-            targetMovePosition = bestCandidate;
-            isMoving = true;
-        }
-        else
-        {
-            // Hiç uygun kare yok
-            //Debug.Log(enemyName + " için uygun hareket bulunamadý.");
-        }
+        if (bestSpot != transform.position) ApplyMove(bestSpot);
     }
 
-    private void AttackPlayer()
+    private void ApplyMove(Vector3 spot)
     {
-        if (playerUnit == null) return;
-        int roll = Random.Range(1, 101);
-        if (roll <= (hitChance - playerUnit.dodgeChance))
+        lastPosition = transform.position;
+        destinationPoint = spot;
+        isMoving = true;
+    }
+
+    private void PerformStrike()
+    {
+        if (playerRef == null) return;
+
+        int chance = hitChance - playerRef.dodgeChance;
+        if (Random.Range(1, 101) <= chance)
         {
-            playerUnit.TakeDamage(damage);
+            playerRef.TakeDamage(damage);
         }
     }
 
-    public void SetRangeText(string message) { if (enemyRangeText != null) enemyRangeText.text = message; }
-    public void ClearRangeText() { if (enemyRangeText != null) enemyRangeText.text = ""; }
+    public void SetRangeText(string msg) { if (feedbackText != null) feedbackText.text = msg; }
+    public void ClearRangeText() { if (feedbackText != null) feedbackText.text = string.Empty; }
 
-    public void TakeDamage(int damageAmount)
+    public void TakeDamage(int amount)
     {
-        currentHealth -= damageAmount;
-        currentHealth = Mathf.Max(currentHealth, 0);
-        UpdateHPUI();
-        if (currentHealth <= 0) Die();
+        currentHealth = Mathf.Max(currentHealth - amount, 0);
+        RefreshStatusUI();
+        if (currentHealth <= 0) ProcessDeath();
     }
 
-    void UpdateHPUI()
+    private void RefreshStatusUI()
     {
-        if (hpText != null) hpText.text = "HP: " + currentHealth + "\nDODGE: %" + dodgeChance;
+        if (hpDisplay != null)
+            hpDisplay.text = $"HP: {currentHealth}\nDGE: %{dodgeChance}";
     }
 
-    void Die()
+    private void ProcessDeath()
     {
-        SetTileOccupied(transform.position, false);
+        UpdateGridStatus(transform.position, false);
         Destroy(gameObject);
     }
 }

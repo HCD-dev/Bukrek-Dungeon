@@ -5,159 +5,132 @@ using UnityEngine.SceneManagement;
 
 public class UIManager : MonoBehaviour
 {
-    public static UIManager Instance;
+    public static UIManager Instance { get; private set; }
 
-    [Header("UI Metinleri")]
-    public TextMeshProUGUI nameText;
-    public TextMeshProUGUI actionText;   // Panelde "AP: 1 / 1" yazar
-    public TextMeshProUGUI movementText; // Panelde "MP: 3 / 3" yazar
-    public TextMeshProUGUI healthText;
-    public TextMeshProUGUI attackText;
-    public TextMeshProUGUI rangeText;
-    public TextMeshProUGUI hitChanceText;
-    public TextMeshProUGUI dodgeText;
+    [Header("Text Displays")]
+    [SerializeField] private TextMeshProUGUI nameLabel;
+    [SerializeField] private TextMeshProUGUI actionPointsLabel;
+    [SerializeField] private TextMeshProUGUI movePointsLabel;
+    [SerializeField] private TextMeshProUGUI healthLabel;
+    [SerializeField] private TextMeshProUGUI damageLabel;
+    [SerializeField] private TextMeshProUGUI rangeLabel;
+    [SerializeField] private TextMeshProUGUI hitChanceLabel;
+    [SerializeField] private TextMeshProUGUI dodgeLabel;
 
-    [Header("Görseller")]
-    public Image unitPortrait;
-    public Image attackActionImage;
-    public Image movementActionImage; // YENÝ: Hareket ikonu için Image bileþeni
+    [Header("Visual Elements")]
+    [SerializeField] private Image portraitDisplay;
+    [SerializeField] private Image attackIconSlot;
+    [SerializeField] private Image movementIconSlot;
+
+    [Header("Resources")]
     public Sprite erlikPortrait, mergenPortrait;
     public Sprite meleeIcon, rangedIcon;
-    public Sprite movementIconSprite; // YENÝ: Hareket ikonu sprite'ý
+    public Sprite movementIconSprite;
 
-    void Awake() { Instance = this; }
-    void Start()
+    private void Awake()
     {
-        // Instance kontrolü (Tekil nesne yapýsý için)
         if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+    }
 
-        // Oyun baþlar baþlamaz tüm metinleri ve resimleri temizle
-        ClearUI();
+    private void Start()
+    {
+        ResetDisplay();
     }
 
     public void ShowUnitInfo(UnitController unit)
     {
-        nameText.text = "<b>" + unit.unitName + "</b>";
+        if (unit == null) return;
 
-        // AP ve MP'yi panelde ayrý ayrý gösteriyoruz
-        actionText.text = "AP: " + unit.currentActionPoints;
-        movementText.text = "MP: " + unit.currentMovementPoints;
+        nameLabel.text = $"<b>{unit.unitName}</b>";
+        actionPointsLabel.text = $"AP: {unit.currentActionPoints}";
+        movePointsLabel.text = $"MP: {unit.currentMovementPoints}";
+        healthLabel.text = $"HP: {unit.currentHealth} / {unit.maxHealth}";
+        damageLabel.text = $"DMG: {unit.attackPower}";
+        rangeLabel.text = $"RNG: {unit.attackRange}";
+        hitChanceLabel.text = $"HIT: %{unit.hitChance}";
 
-        healthText.text = "HP: " + unit.currentHealth + " / " + unit.maxHealth;
-        attackText.text = "Damage: " + unit.attackPower;
-        rangeText.text = "Range: " + unit.attackRange;
-        hitChanceText.text = "Hit Chance: %" + unit.hitChance;
+        if (dodgeLabel != null)
+            dodgeLabel.text = $"DGE: %{unit.dodgeChance}";
 
-        unitPortrait.color = Color.white;
+        UpdateIcons(unit);
+    }
 
-        // Saldýrý resmi sadece AP varsa tam görünür
-        attackActionImage.color = unit.currentActionPoints > 0 ? Color.white : new Color(1, 1, 1, 0.3f);
+    private void UpdateIcons(UnitController unit)
+    {
+        portraitDisplay.color = Color.white;
+        portraitDisplay.sprite = unit.unitName == "Mergen" ? mergenPortrait : erlikPortrait;
 
-        // YENÝ: Hareket resmi sadece MP varsa tam görünür
-        if (movementActionImage != null)
+        // Attack Icon Logic
+        attackIconSlot.sprite = unit.unitName == "Mergen" ? rangedIcon : meleeIcon;
+        attackIconSlot.color = unit.currentActionPoints > 0 ? Color.white : new Color(1, 1, 1, 0.3f);
+
+        // Movement Icon Logic
+        if (movementIconSlot != null)
         {
-            movementActionImage.sprite = movementIconSprite;
-            movementActionImage.color = unit.currentMovementPoints > 0 ? Color.white : new Color(1, 1, 1, 0.3f);
-        }
-
-        if (dodgeText != null)
-        {
-            dodgeText.text = "DODGE: %" + unit.dodgeChance;
-        }
-        if (unit.unitName == "Mergen")
-        {
-            unitPortrait.sprite = mergenPortrait;
-            attackActionImage.sprite = rangedIcon;
-        }
-        else
-        {
-            unitPortrait.sprite = erlikPortrait;
-            attackActionImage.sprite = meleeIcon;
+            movementIconSlot.sprite = movementIconSprite;
+            movementIconSlot.color = unit.currentMovementPoints > 0 ? Color.white : new Color(1, 1, 1, 0.3f);
         }
     }
 
-    public void ClearUI()
+    public void ResetDisplay()
     {
-        rangeText.text = "";
-        hitChanceText.text = "";
-        nameText.text = "";
-        actionText.text = "";
-        movementText.text = "";
-        healthText.text = "";
-        attackText.text = "";
-        unitPortrait.color = new Color(0, 0, 0, 0);
-        attackActionImage.color = new Color(0, 0, 0, 0);
-        if (dodgeText != null)
-        {
-            dodgeText.text = "";
-        }
+        nameLabel.text = string.Empty;
+        actionPointsLabel.text = string.Empty;
+        movePointsLabel.text = string.Empty;
+        healthLabel.text = string.Empty;
+        damageLabel.text = string.Empty;
+        rangeLabel.text = string.Empty;
+        hitChanceLabel.text = string.Empty;
 
-        // YENÝ: Temizlerken hareket ikonunu da gizle
-        if (movementActionImage != null) movementActionImage.color = new Color(0, 0, 0, 0);
+        if (dodgeLabel != null) dodgeLabel.text = string.Empty;
+
+        portraitDisplay.color = Color.clear;
+        attackIconSlot.color = Color.clear;
+        if (movementIconSlot != null) movementIconSlot.color = Color.clear;
     }
 
-    // YENÝ: Hareket ikonuna týklandýðýnda çalýþacak fonksiyon
-    public void OnMovementImageClick()
+    public void ToggleMovementMode()
     {
-        if (UnitController.selectedUnit != null)
+        var unit = UnitController.selectedUnit;
+        if (unit != null && unit.currentMovementPoints > 0)
         {
-            if (UnitController.selectedUnit.currentMovementPoints > 0)
-            {
-                UnitController.selectedUnit.isMovementModeActive = true;
-                UnitController.selectedUnit.isSelectingTarget = false; // Saldýrý modunu kapat
-                Debug.Log("Hareket modu aktif!");
-            }
-            else
-            {
-                Debug.Log("Hareket puaný yetersiz!");
-            }
+            unit.isMovementModeActive = true;
+            unit.isSelectingTarget = false;
         }
     }
 
-    public void OnAttackImageClick()
+    public void ToggleAttackMode()
     {
-        if (UnitController.selectedUnit != null)
+        var unit = UnitController.selectedUnit;
+        if (unit != null && unit.currentActionPoints > 0)
         {
-            if (UnitController.selectedUnit.currentActionPoints > 0)
-            {
-                UnitController.selectedUnit.isSelectingTarget = true;
-                UnitController.selectedUnit.isMovementModeActive = false; // Hareket modunu kapat
-                Debug.Log("Saldýrý modu aktif!");
-            }
-            else
-            {
-                Debug.Log("Saldýrý puaný yetersiz!");
-            }
+            unit.isSelectingTarget = true;
+            unit.isMovementModeActive = false;
         }
     }
 
-    public void EndTurn()
+    public void CommitEndTurn()
     {
-        // 1. Oyuncu birimlerini sýfýrla
-        UnitController[] allUnits = Object.FindObjectsByType<UnitController>(FindObjectsSortMode.None);
-        foreach (UnitController unit in allUnits)
+        UnitController[] playerUnits = FindObjectsByType<UnitController>(FindObjectsSortMode.None);
+        foreach (var unit in playerUnits)
         {
-            unit.ResetPoints();
-            unit.DeselectUnit();
+            unit.RefreshUnit(); // ResetPoints yerine yeni metod adý
+            unit.Deselect();    // DeselectUnit yerine yeni metod adý
         }
 
         UnitController.selectedUnit = null;
-        ClearUI();
+        ResetDisplay();
 
-        // 2. TURN MANAGER'A HABER VER (Eklendi)
-        // Eðer sahnede TurnManager varsa düþman turunu baþlatýr
         if (TurnManager.Instance != null)
         {
-            TurnManager.Instance.OnEndTurnButtonPressed();
+            TurnManager.Instance.FinalizePlayerTurn(); // OnEndTurnButtonPressed yerine yeni metod adý
         }
-
-        Debug.Log("<color=cyan>Tur Sonlandýrýldý! Düþman sýrasý kontrol ediliyor.</color>");
     }
 
-    public void RestartGame()
+    public void ReloadLevel()
     {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         UnitController.selectedUnit = null;
-        Debug.Log("<color=yellow>Oyun Sýfýrlandý!</color>");
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

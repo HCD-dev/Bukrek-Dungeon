@@ -1,64 +1,72 @@
 using UnityEngine;
-using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
 public class TurnManager : MonoBehaviour
 {
-    public static TurnManager Instance;
+    public static TurnManager Instance { get; private set; }
 
-    public enum TurnState { PlayerTurn, EnemyTurn, Busy }
-    public TurnState currentState;
+    public enum TurnPhase { Player, Enemy, Processing }
+    public TurnPhase CurrentPhase { get; private set; }
 
-    private List<EnemyController> allEnemies = new List<EnemyController>();
+    [SerializeField] private float delayBetweenEnemies = 1.5f;
+    private readonly List<EnemyController> activeEnemies = new List<EnemyController>();
 
-    void Awake()
+    private void Awake()
     {
-        Instance = this;
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
     }
 
-    void Start()
+    private void Start()
     {
-        // Oyuna oyuncu turuyla baþla
-        currentState = TurnState.PlayerTurn;
-        RefreshEnemyList();
+        CurrentPhase = TurnPhase.Player;
+        InitializeEnemies();
     }
 
-    // Bu fonksiyonu UI Butonuna baðlayacaksýn
-    public void OnEndTurnButtonPressed()
+    public void FinalizePlayerTurn()
     {
-        if (currentState == TurnState.PlayerTurn)
+        if (CurrentPhase == TurnPhase.Player)
         {
-            StartCoroutine(EnemyTurnRoutine());
+            StartCoroutine(ProcessEnemyActions());
         }
     }
 
-    private IEnumerator EnemyTurnRoutine()
+    private IEnumerator ProcessEnemyActions()
     {
-        currentState = TurnState.EnemyTurn;
-        Debug.Log("Düþman Turu Baþladý!");
+        CurrentPhase = TurnPhase.Enemy;
 
-        // Sahnedeki tüm düþmanlarý bul
-        RefreshEnemyList();
-
-        foreach (EnemyController enemy in allEnemies)
+        // Perform logic for each enemy sequentially
+        foreach (var enemy in activeEnemies)
         {
-            if (enemy != null)
-            {
-                // Düþmanýn sýrasýný iþle ve bitmesini bekle
-                enemy.ExecuteTurn();
-                // Düþman hareket ederken bekleme süresi (Düþman baþýna 2 saniye gibi)
-                yield return new WaitForSeconds(2.5f);
-            }
+            if (enemy == null) continue;
+
+            enemy.ExecuteTurn();
+            yield return new WaitForSeconds(delayBetweenEnemies);
         }
 
-        Debug.Log("Oyuncu Turu Baþladý!");
-        currentState = TurnState.PlayerTurn;
+        ResetToPlayerTurn();
     }
 
-    void RefreshEnemyList()
+    private void ResetToPlayerTurn()
     {
-        allEnemies.Clear();
-        allEnemies.AddRange(Object.FindObjectsByType<EnemyController>(FindObjectsSortMode.None));
+        CurrentPhase = TurnPhase.Player;
+    }
+
+    private void InitializeEnemies()
+    {
+        activeEnemies.Clear();
+        activeEnemies.AddRange(FindObjectsByType<EnemyController>(FindObjectsSortMode.None));
+    }
+
+    public void RegisterEnemy(EnemyController enemy)
+    {
+        if (!activeEnemies.Contains(enemy))
+            activeEnemies.Add(enemy);
+    }
+
+    public void UnregisterEnemy(EnemyController enemy)
+    {
+        activeEnemies.Remove(enemy);
     }
 }
