@@ -1,0 +1,1 @@
+Bükrek Dungeon. Tilelar üzerinde hareket edilen bir Strateji oyunu. Basit Demo. Zar atılarak saldırı yapılıyor. Gemini AI ve Githup Copilot dan yardım alınarak yapıldı. https://www.linkedin.com/in/h%C3%BCseyin-%C3%A7agatay-do%C4%9Fruyol/
