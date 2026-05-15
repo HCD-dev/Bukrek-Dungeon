@@ -1022,7 +1022,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1673523950}
         m_TargetAssemblyTypeName: UIManager, Assembly-CSharp
-        m_MethodName: RestartGame
+        m_MethodName: ReloadLevel
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1746,7 +1746,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1673523950}
         m_TargetAssemblyTypeName: UIManager, Assembly-CSharp
-        m_MethodName: EndTurn
+        m_MethodName: CommitEndTurn
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -3041,7 +3041,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1673523950}
         m_TargetAssemblyTypeName: UIManager, Assembly-CSharp
-        m_MethodName: OnMovementImageClick
+        m_MethodName: ToggleMovementMode
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -3211,7 +3211,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1673523950}
         m_TargetAssemblyTypeName: UIManager, Assembly-CSharp
-        m_MethodName: OnAttackImageClick
+        m_MethodName: ToggleAttackMode
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
