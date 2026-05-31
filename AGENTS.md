@@ -2,7 +2,7 @@
 - Project name: Bukrek Dungeon
 - Unity version: Unity 6000.3.8f1
 - Active game object:
-  - Name: ResetButton
+  - Name: HumanM@BowIdle01
   - Tag: Untagged
-  - Layer: UI
+  - Layer: Default
 <!-- UNITY CODE ASSIST INSTRUCTIONS END -->
