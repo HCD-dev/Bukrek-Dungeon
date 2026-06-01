@@ -3,13 +3,19 @@ using TMPro;
 using KevinIglesias;
 using UnityEngine.EventSystems;
 using System.Collections;
+using System; // Event'leri (Action) kullanabilmek için ekledik
 
 public class UnitController : MonoBehaviour
 {
+
     private bool isInteractionLocked = false;
     [HideInInspector] public bool isMovementModeActive = false;
     private EnemyController lastHoveredEnemy;
     public static UnitController selectedUnit;
+
+    // --- EVENT'LER (ACTIONS) ---
+    public static event Action<UnitController> OnMovementModeStarted;
+    public static event Action<UnitController, Vector3> OnMovementCompleted;
 
     [Header("Identity")]
     public string unitName;
@@ -42,13 +48,28 @@ public class UnitController : MonoBehaviour
 
     private TileControl lastHoveredTile;
     private Animator animator;
+    private HumanArcherController archerCtrl;
 
     void Start()
     {
+        // Önce alt objelerde arar, bulamazsa kendi üzerinde arar
         animator = GetComponentInChildren<Animator>();
         if (animator == null)
         {
             animator = GetComponent<Animator>();
+        }
+
+        // --- MERGEN ÝÇÝN ARCHER CONTROLLER'I ÖNDEN HAZIRLAMA ---
+        if (unitName == "Mergen")
+        {
+            archerCtrl = GetComponentInChildren<HumanArcherController>(true);
+
+            if (archerCtrl != null)
+            {
+                // Paketin yayý ve oku el kemiklerine oyun baþýnda baðlamasýný zorluyoruz.
+                // Bu sayede ilk saldýrý anýnda her þey hafýzada hazýr olacak.
+                archerCtrl.gameObject.SendMessage("Start", SendMessageOptions.DontRequireReceiver);
+            }
         }
 
         currentHealth = maxHealth;
@@ -58,29 +79,26 @@ public class UnitController : MonoBehaviour
 
         if (selectionRing != null) selectionRing.SetActive(false);
         SetTileStatus(transform.position, true);
+    }
 
-        // =================================================================
-        // --- KEVIN IGLESIAS ÝLK ATIÞ BUG'I ÝÇÝN KESÝN ÇÖZÜM (SÝSTEMÝ ISITMA) ---
-        // =================================================================
-        if (unitName == "Mergen")
-        {
-            HumanArcherController archerCtrl = GetComponentInChildren<HumanArcherController>(true);
-            if (archerCtrl != null)
-            {
-                // Sistem ilk açýlýþta ok ve yayý hafýzasýna alsýn diye görünmez bir hazýrlýk yapýyoruz
-                archerCtrl.LoadBow(0f, 0.01f);
-                archerCtrl.ShootArrow(0.01f, 0.01f);
-                archerCtrl.GetArrow(0.02f);
-            }
-        }
-        // =================================================================
+    public void ActivateMovementMode()
+    {
+        if (isInteractionLocked || isMoving || currentMovementPoints <= 0) return;
+
+        isMovementModeActive = true;
+        isSelectingTarget = false;
+
+        OnMovementModeStarted?.Invoke(this);
     }
 
     void Update()
     {
+        // --- TURN MANAGER SINGLETON KONTROLÜ (NULL-SAFE) ---
+        if (TurnManager.Instance == null) return;
+
         if (TurnManager.Instance.CurrentPhase != TurnManager.TurnPhase.Player) return;
 
-        // --- GÜVENLÝ PARAMETRE KONTROLÜ (DÜZELTÝLDÝ) ---
+        // --- GÜVENLÝ PARAMETRE KONTROLÜ (NULL-SAFE) ---
         if (animator != null)
         {
             bool hasIsMovingParam = false;
@@ -95,13 +113,11 @@ public class UnitController : MonoBehaviour
 
             if (hasIsMovingParam)
             {
-                // Eðer etkileþim kilitliyse (örn: ateþ ediyorsa) yürümeyi sýfýra zorla ki animasyon bölünmesin
-                bool finalMoveState = isInteractionLocked ? false : isMoving;
-                animator.SetBool("isMoving", finalMoveState);
+                // Katmaný Additive yaptýðýmýz için artýk isMoving'i özgür býrakýyoruz.
+                animator.SetBool("isMoving", isMoving);
             }
         }
 
-        // Metot çaðrýlarý güvenli bir þekilde döngülerin ve if'lerin dýþýna alýndý
         HandleInteraction();
         ProcessHoverEffects();
 
@@ -111,9 +127,8 @@ public class UnitController : MonoBehaviour
             Vector3 moveDirection = (targetPosition - transform.position).normalized;
             if (moveDirection != Vector3.zero)
             {
-                moveDirection.y = 0; // Karakterin öne/arkaya eðilmesini engeller
+                moveDirection.y = 0;
                 Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
-                // Yumuþak dönüþ saðlar
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 15f * Time.deltaTime);
             }
 
@@ -123,6 +138,8 @@ public class UnitController : MonoBehaviour
                 transform.position = targetPosition;
                 isMoving = false;
                 SetTileStatus(transform.position, true);
+
+                OnMovementCompleted?.Invoke(this, transform.position);
             }
         }
     }
@@ -284,7 +301,7 @@ public class UnitController : MonoBehaviour
 
     public void FocusOnUnit(UnitController unit)
     {
-        UnitController[] units = Object.FindObjectsByType<UnitController>(FindObjectsSortMode.None);
+        UnitController[] units = UnityEngine.Object.FindObjectsByType<UnitController>(FindObjectsSortMode.None);
         foreach (var u in units) u.Deselect();
         selectedUnit = unit;
         if (unit.selectionRing != null) unit.selectionRing.SetActive(true);
@@ -309,36 +326,53 @@ public class UnitController : MonoBehaviour
             isInteractionLocked = true;
             currentActionPoints--;
 
-            // --- EN GARANTÝ ALT OBJE BULMA YÖNTEMÝ ---
-            // MergenCapsule altýndaki HumanM_Model ve diðer tüm çocuklarý tarar
-            HumanArcherController archerCtrl = GetComponentInChildren<HumanArcherController>(true);
+            Vector3 targetDirection = new Vector3(target.transform.position.x, transform.position.y, target.transform.position.z);
+            transform.LookAt(targetDirection);
 
-            if (unitName == "Mergen" && archerCtrl != null)
+            // --- HAKEMLÝK EDEN DÝNAMÝK ANÝMASYON BLOKLARI ---
+            // --- HAKEMLÝK EDEN DÝNAMÝK ANÝMASYON BLOKLARI ---
+            if (unitName == "Mergen")
             {
-                // 1. Önce koþma durumunu kapat ki Animator üst katmaný (Shoot layer) engellemesil
-                if (animator != null) animator.SetBool("isMoving", false);
+                // Artýk yukarýda Start'ta önbelleðe aldýðýmýz archerCtrl deðiþkenini doðrudan kullanýyoruz
+                if (archerCtrl != null)
+                {
+                    // Katman Additive olduðu için en kararlý çalýþan "Shoot" yapýsý
+                    archerCtrl.PlayArcherAnimation(ArcherAnimation.ShootRunning);
+                    archerCtrl.LoadBow(0f, 0.4f);
+                    archerCtrl.ShootArrow(0.4f, 0.05f);
+                    archerCtrl.GetArrow(0.9f);
+                    Debug.Log("archerCtrl works!");
+                }
+                else if (animator != null)
+                {
+                    animator.SetTrigger("Shoot");
+                }
+            }
+   
+            else if (unitName == "Erlik")
+            {
+                if (animator != null)
+                {
+                    // Erlik için Animator'da hangi tetikleyici varsa onu güvenle ateþler.
+                    // Eðer "Attack" parametresi varsa onu, yoksa fallback olarak "Shoot" dener.
+                    bool hasAttackParam = false;
+                    foreach (AnimatorControllerParameter param in animator.parameters)
+                    {
+                        if (param.name == "Attack") { hasAttackParam = true; break; }
+                    }
 
-                // 2. Ana kapsülü (MergenCapsule) tamamen düþmana döndür
-                Vector3 targetDirection = new Vector3(target.transform.position.x, transform.position.y, target.transform.position.z);
-                transform.LookAt(targetDirection);
-
-                // 3. Alt objedeki (HumanM_Model) Kevin Iglesias oynatýcýsýný baþlat
-                // Bu fonksiyon artýk alt objeyi kesin bulduðu için Shoot katmanýndaki animasyonlarý sýrayla tetikleyecek
-                archerCtrl.PlayArcherAnimation(ArcherAnimation.Shoot);
-
-                // 4. Yay ve Ok Coroutine'leri (Alt objedeki modele baðlý yay/ok modellerini çalýþtýrýr)
-                archerCtrl.LoadBow(0f, 0.4f);
-                archerCtrl.ShootArrow(0.4f, 0.05f);
-                archerCtrl.GetArrow(0.9f);
+                    if (hasAttackParam) animator.SetTrigger("Attack");
+                    else animator.SetTrigger("ShootRunning");
+                }
             }
             else
             {
-                // Erlik veya diðer üniteler için normal tetikleyici
-                if (animator != null) animator.SetTrigger("Shoot");
+                // Ýleride eklenebilecek diðer standart birimler için genel mantýk
+                if (animator != null) animator.SetTrigger("Attack");
             }
 
-            // Hasar hesaplamasý
-            if (Random.Range(1, 101) <= (hitChance - target.dodgeChance))
+            // --- Hasar/Iska Mantýðý ---
+            if (UnityEngine.Random.Range(1, 101) <= (hitChance - target.dodgeChance))
             {
                 StartCoroutine(DelayedDamage(target, attackPower, 0.5f));
             }
