@@ -1,19 +1,18 @@
 using UnityEngine;
 using TMPro;
-using KevinIglesias;
+using KevinIglesias; // Sadece Mergen'in okçu paketi için kalýyor
 using UnityEngine.EventSystems;
 using System.Collections;
-using System; // Event'leri (Action) kullanabilmek için ekledik
+using System;
 
 public class UnitController : MonoBehaviour
 {
-
     private bool isInteractionLocked = false;
     [HideInInspector] public bool isMovementModeActive = false;
     private EnemyController lastHoveredEnemy;
     public static UnitController selectedUnit;
 
-    // --- EVENT'LER (ACTIONS) ---
+    // --- EVENT'LER ---
     public static event Action<UnitController> OnMovementModeStarted;
     public static event Action<UnitController, Vector3> OnMovementCompleted;
 
@@ -48,26 +47,25 @@ public class UnitController : MonoBehaviour
 
     private TileControl lastHoveredTile;
     private Animator animator;
+
+    // --- MERGEN ÝÇÝN OKÇU SCRIPT REFERANSI ---
     private HumanArcherController archerCtrl;
 
     void Start()
     {
-        // Önce alt objelerde arar, bulamazsa kendi üzerinde arar
+        // Karakterin kendisindeki veya alt modelindeki Animator'ý bulur
         animator = GetComponentInChildren<Animator>();
         if (animator == null)
         {
             animator = GetComponent<Animator>();
         }
 
-        // --- MERGEN ÝÇÝN ARCHER CONTROLLER'I ÖNDEN HAZIRLAMA ---
+        // --- MERGEN (OKÇU) BAÞLANGIÇ AYARI ---
         if (unitName == "Mergen")
         {
             archerCtrl = GetComponentInChildren<HumanArcherController>(true);
-
             if (archerCtrl != null)
             {
-                // Paketin yayý ve oku el kemiklerine oyun baþýnda baðlamasýný zorluyoruz.
-                // Bu sayede ilk saldýrý anýnda her þey hafýzada hazýr olacak.
                 archerCtrl.gameObject.SendMessage("Start", SendMessageOptions.DontRequireReceiver);
             }
         }
@@ -93,28 +91,16 @@ public class UnitController : MonoBehaviour
 
     void Update()
     {
-        // --- TURN MANAGER SINGLETON KONTROLÜ (NULL-SAFE) ---
         if (TurnManager.Instance == null) return;
-
         if (TurnManager.Instance.CurrentPhase != TurnManager.TurnPhase.Player) return;
 
-        // --- GÜVENLÝ PARAMETRE KONTROLÜ (NULL-SAFE) ---
+        // --- WALK / YÜRÜME ANÝMASYON KONTROLÜ ---
         if (animator != null)
         {
-            bool hasIsMovingParam = false;
-            foreach (AnimatorControllerParameter param in animator.parameters)
+            // Animator pencerendeki 'isWalking' parametresini günceller
+            if (HasParameter("isWalking"))
             {
-                if (param.name == "isMoving")
-                {
-                    hasIsMovingParam = true;
-                    break;
-                }
-            }
-
-            if (hasIsMovingParam)
-            {
-                // Katmaný Additive yaptýðýmýz için artýk isMoving'i özgür býrakýyoruz.
-                animator.SetBool("isMoving", isMoving);
+                animator.SetBool("isWalking", isMoving);
             }
         }
 
@@ -123,7 +109,6 @@ public class UnitController : MonoBehaviour
 
         if (isMoving)
         {
-            // --- Týkladýðý Hedefe Doðru Dönerek Yürüme ---
             Vector3 moveDirection = (targetPosition - transform.position).normalized;
             if (moveDirection != Vector3.zero)
             {
@@ -142,6 +127,124 @@ public class UnitController : MonoBehaviour
                 OnMovementCompleted?.Invoke(this, transform.position);
             }
         }
+    }
+
+    // --- ATTACK / SALDIRI ANÝMASYON KONTROLÜ ---
+    public void ExecuteCombat(EnemyController target)
+    {
+        if (currentActionPoints <= 0 || isInteractionLocked) return;
+
+        int dist = Mathf.RoundToInt(Vector3.Distance(transform.position, target.transform.position) / stepSize);
+        if (dist <= attackRange)
+        {
+            isInteractionLocked = true;
+            currentActionPoints--;
+
+            Vector3 targetDirection = new Vector3(target.transform.position.x, transform.position.y, target.transform.position.z);
+            transform.LookAt(targetDirection);
+
+            // 1) MERGEN (Kevin Iglesias Okçu Sistemi)
+            if (unitName == "Mergen" && archerCtrl != null)
+            {
+                archerCtrl.PlayArcherAnimation(ArcherAnimation.ShootRunning);
+                archerCtrl.LoadBow(0f, 0.4f);
+                archerCtrl.ShootArrow(0.4f, 0.05f);
+                archerCtrl.GetArrow(0.9f);
+            }
+            // 2) ERLÝK veya Diðer Durumlar (Doðrudan Animator Trigger'larý)
+            else
+            {
+                if (animator != null && HasParameter("Attack"))
+                {
+                    animator.SetTrigger("Attack");
+                }
+            }
+
+            // Hasar verme animasyon zamanlamasý (0.6 saniye sonra vurur)
+            if (UnityEngine.Random.Range(1, 101) <= (hitChance - target.dodgeChance))
+            {
+                StartCoroutine(DelayedDamage(target, attackPower, 0.6f));
+            }
+            else
+            {
+                StartCoroutine(DelayedMiss(target, 0.6f));
+            }
+
+            StartCoroutine(ReleaseInteractionLock(target, 1.5f));
+            if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
+        }
+    }
+
+    // --- DAMAGE / HASAR ALMA ANÝMASYON KONTROLÜ ---
+    public void TakeDamage(int amount)
+    {
+        currentHealth = Mathf.Max(currentHealth - amount, 0);
+
+        // Karakter ölmediyse hasar alma ("Damage" Trigger) animasyonunu oynatýr
+        if (animator != null && currentHealth > 0)
+        {
+            if (HasParameter("Damage"))
+            {
+                animator.SetTrigger("Damage");
+            }
+        }
+
+        if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
+        if (currentHealth <= 0) HandleDeath();
+    }
+
+    // --- DEATH / ÖLÜM ANÝMASYON KONTROLÜ ---
+    void HandleDeath()
+    {
+        SetTileStatus(transform.position, false);
+        isInteractionLocked = true;
+
+        if (animator != null && HasParameter("Death"))
+        {
+            // Ölüm ("Death" Trigger) animasyonunu baþlatýr
+            animator.SetTrigger("Death");
+
+            // Animasyon klibinin tamamlanmasý için karakteri 2.0 saniye sonra sahnenden siler
+            Destroy(gameObject, 2.0f);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    // --- PARAMETRE GÜVENLÝK KONTROLÜ ---
+    private bool HasParameter(string paramName)
+    {
+        if (animator == null) return false;
+        foreach (AnimatorControllerParameter param in animator.parameters)
+        {
+            if (param.name == paramName) return true;
+        }
+        return false;
+    }
+
+    private IEnumerator DelayedDamage(EnemyController target, int dmg, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (target != null)
+        {
+            target.TakeDamage(dmg);
+            target.SetRangeText("<color=yellow>HIT!</color>");
+        }
+    }
+
+    private IEnumerator DelayedMiss(EnemyController target, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (target != null) target.SetRangeText("<color=red>MISS</color>");
+    }
+
+    private IEnumerator ReleaseInteractionLock(EnemyController target, float time)
+    {
+        yield return new WaitForSeconds(time);
+        if (target != null) target.ClearRangeText();
+        isInteractionLocked = false;
     }
 
     private void SetTileStatus(Vector3 pos, bool occupied)
@@ -210,7 +313,7 @@ public class UnitController : MonoBehaviour
         if (isInteractionLocked) return;
 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(ray, out RaycastHit hit, 500f))
+        if (Physics.Raycast(ray, out RaycastHit hit, 500f, gridLayer)) // Sadece grid katmanýna bakýyoruz
         {
             if (isSelectingTarget && selectedUnit == this)
             {
@@ -237,45 +340,23 @@ public class UnitController : MonoBehaviour
                     if (lastHoveredTile != null) lastHoveredTile.HideRange();
                     lastHoveredTile = tile;
 
-                    int dist = Mathf.RoundToInt(Vector3.Distance(transform.position, tile.transform.position) / stepSize);
-                    bool isValid = dist <= currentMovementPoints && dist > 0 && ValidatePath(transform.position, tile.transform.position);
+                    // --- HATA DÜZELTMESÝ: GIZLÝ ÇAPRAZ HESAPLAMAYI ENGELLEME (MANHATTAN DISTANCE) ---
+                    float targetX = Mathf.Round(tile.transform.position.x / stepSize) * stepSize;
+                    float targetZ = Mathf.Round(tile.transform.position.z / stepSize) * stepSize;
+
+                    int gridDistX = Mathf.RoundToInt(Mathf.Abs(targetX - transform.position.x) / stepSize);
+                    int gridDistZ = Mathf.RoundToInt(Mathf.Abs(targetZ - transform.position.z) / stepSize);
+                    int totalGridCost = gridDistX + gridDistZ; // Karakterin harcayacaðý gerçek hareket puaný
+
+                    // Hem puaný yetmeli hem de önünde engel olmamalý
+                    bool isValid = totalGridCost <= currentMovementPoints && totalGridCost > 0 && ValidatePath(transform.position, tile.transform.position);
+
                     tile.ShowRange(isValid);
                     return;
                 }
             }
         }
         ResetHoverVisuals();
-    }
-
-    private void ResetHoverVisuals()
-    {
-        if (lastHoveredEnemy != null) { lastHoveredEnemy.ClearRangeText(); lastHoveredEnemy = null; }
-        if (lastHoveredTile != null) { lastHoveredTile.HideRange(); lastHoveredTile = null; }
-    }
-
-    void HandleInteraction()
-    {
-        if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject())
-        {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit))
-            {
-                if (selectedUnit != this)
-                {
-                    UnitController targetUnit = hit.collider.GetComponent<UnitController>();
-                    if (targetUnit != null) FocusOnUnit(targetUnit);
-                    return;
-                }
-
-                EnemyController enemy = hit.collider.GetComponent<EnemyController>();
-                if (enemy != null && isSelectingTarget) ExecuteCombat(enemy);
-                else if (hit.collider.GetComponent<TileControl>() && isMovementModeActive)
-                {
-                    if (ValidatePath(transform.position, hit.collider.transform.position))
-                        InitiateMove(hit.collider.transform.position);
-                }
-            }
-        }
     }
 
     void InitiateMove(Vector3 destination)
@@ -289,15 +370,78 @@ public class UnitController : MonoBehaviour
         if (cost > 0 && cost <= currentMovementPoints && !CheckUnitPresence(finalCoords))
         {
             SetTileStatus(transform.position, false);
-            if (lastHoveredTile != null) lastHoveredTile.HideRange();
+
+            // --- HATA DÜZELTMESÝ: HAREKET BAÞLADIÐI AN ESKÝ GÖRSELÝ SIFIRLA ---
+            if (lastHoveredTile != null)
+            {
+                lastHoveredTile.HideRange();
+                lastHoveredTile = null;
+            }
 
             targetPosition = finalCoords;
             isMoving = true;
             currentMovementPoints -= cost;
 
+            // Hareket modunu kapatýyoruz ki vardýðý yerde karolar otomatik kýrmýzý/yeþil takýlý kalmasýn
+            isMovementModeActive = false;
+
             if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
         }
     }
+
+    private void ResetHoverVisuals()
+    {
+        if (lastHoveredEnemy != null) { lastHoveredEnemy.ClearRangeText(); lastHoveredEnemy = null; }
+        if (lastHoveredTile != null) { lastHoveredTile.HideRange(); lastHoveredTile = null; }
+    }
+
+    void HandleInteraction()
+    {
+        // Eðer UI (Arayüz) elementlerine (buton vb.) týklanýyorsa haritaya týklamayý engelle
+        if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject())
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
+
+            // --- DÜZELTME 1: HAREKET MODUNDAYSA SADECE GRID KATMANINA IÞIN AT ---
+            if (isMovementModeActive)
+            {
+                // 500f mesafe içinde sadece gridLayer katmanýndaki objeleri yakala
+                if (Physics.Raycast(ray, out hit, 500f, gridLayer))
+                {
+                    TileControl tile = hit.collider.GetComponent<TileControl>();
+                    if (tile != null)
+                    {
+                        if (ValidatePath(transform.position, tile.transform.position))
+                        {
+                            InitiateMove(tile.transform.position);
+                        }
+                    }
+                }
+            }
+            // --- DÜZELTME 2: DÝÐER ETKÝLEÞÝMLER (SEÇÝM VE SALDIRI) ---
+            else
+            {
+                if (Physics.Raycast(ray, out hit, 500f))
+                {
+                    if (selectedUnit != this)
+                    {
+                        UnitController targetUnit = hit.collider.GetComponent<UnitController>();
+                        if (targetUnit != null) FocusOnUnit(targetUnit);
+                        return;
+                    }
+
+                    EnemyController enemy = hit.collider.GetComponent<EnemyController>();
+                    if (enemy != null && isSelectingTarget)
+                    {
+                        ExecuteCombat(enemy);
+                    }
+                }
+            }
+        }
+    }
+
+   
 
     public void FocusOnUnit(UnitController unit)
     {
@@ -316,83 +460,6 @@ public class UnitController : MonoBehaviour
         ResetHoverVisuals();
     }
 
-    public void ExecuteCombat(EnemyController target)
-    {
-        if (currentActionPoints <= 0) return;
-
-        int dist = Mathf.RoundToInt(Vector3.Distance(transform.position, target.transform.position) / stepSize);
-        if (dist <= attackRange)
-        {
-            isInteractionLocked = true;
-            currentActionPoints--;
-
-            Vector3 targetDirection = new Vector3(target.transform.position.x, transform.position.y, target.transform.position.z);
-            transform.LookAt(targetDirection);
-
-            // --- HAKEMLÝK EDEN DÝNAMÝK ANÝMASYON BLOKLARI ---
-            // --- HAKEMLÝK EDEN DÝNAMÝK ANÝMASYON BLOKLARI ---
-            if (unitName == "Mergen")
-            {
-                // Artýk yukarýda Start'ta önbelleðe aldýðýmýz archerCtrl deðiþkenini doðrudan kullanýyoruz
-                if (archerCtrl != null)
-                {
-                    // Katman Additive olduðu için en kararlý çalýþan "Shoot" yapýsý
-                    archerCtrl.PlayArcherAnimation(ArcherAnimation.ShootRunning);
-                    archerCtrl.LoadBow(0f, 0.4f);
-                    archerCtrl.ShootArrow(0.4f, 0.05f);
-                    archerCtrl.GetArrow(0.9f);
-                    Debug.Log("archerCtrl works!");
-                }
-                else if (animator != null)
-                {
-                    animator.SetTrigger("Shoot");
-                }
-            }
-   
-            else if (unitName == "Erlik")
-            {
-                if (animator != null)
-                {
-                    // Erlik için Animator'da hangi tetikleyici varsa onu güvenle ateþler.
-                    // Eðer "Attack" parametresi varsa onu, yoksa fallback olarak "Shoot" dener.
-                    bool hasAttackParam = false;
-                    foreach (AnimatorControllerParameter param in animator.parameters)
-                    {
-                        if (param.name == "Attack") { hasAttackParam = true; break; }
-                    }
-
-                    if (hasAttackParam) animator.SetTrigger("Attack");
-                    else animator.SetTrigger("ShootRunning");
-                }
-            }
-            else
-            {
-                // Ýleride eklenebilecek diðer standart birimler için genel mantýk
-                if (animator != null) animator.SetTrigger("Attack");
-            }
-
-            // --- Hasar/Iska Mantýðý ---
-            if (UnityEngine.Random.Range(1, 101) <= (hitChance - target.dodgeChance))
-            {
-                StartCoroutine(DelayedDamage(target, attackPower, 0.5f));
-            }
-            else
-            {
-                StartCoroutine(DelayedMiss(target, 0.5f));
-            }
-
-            StartCoroutine(ReleaseInteractionLock(target, 1.5f));
-            if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
-        }
-    }
-
-    private IEnumerator ReleaseInteractionLock(EnemyController target, float time)
-    {
-        yield return new WaitForSeconds(time);
-        if (target != null) target.ClearRangeText();
-        isInteractionLocked = false;
-    }
-
     public void RefreshUnit()
     {
         currentMovementPoints = maxMovementPoints;
@@ -400,34 +467,5 @@ public class UnitController : MonoBehaviour
         isSelectingTarget = false;
         isMovementModeActive = false;
         isMoving = false;
-    }
-
-    public void TakeDamage(int amount)
-    {
-        currentHealth = Mathf.Max(currentHealth - amount, 0);
-        if (UIManager.Instance != null) UIManager.Instance.ShowUnitInfo(this);
-        if (currentHealth <= 0) HandleDeath();
-    }
-
-    void HandleDeath()
-    {
-        SetTileStatus(transform.position, false);
-        Destroy(gameObject);
-    }
-
-    private IEnumerator DelayedDamage(EnemyController target, int dmg, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        if (target != null)
-        {
-            target.TakeDamage(dmg);
-            target.SetRangeText("<color=yellow>HIT!</color>");
-        }
-    }
-
-    private IEnumerator DelayedMiss(EnemyController target, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        if (target != null) target.SetRangeText("<color=red>MISS</color>");
     }
 }

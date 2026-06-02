@@ -229,7 +229,7 @@ public class EnemyController : MonoBehaviour
     private void RefreshStatusUI()
     {
         if (hpDisplay != null)
-            hpDisplay.text = $"HP: {currentHealth}\nDGE: %{dodgeChance}";
+            hpDisplay.text = $"HP: {currentHealth}\nDODGE: %{dodgeChance}";
     }
 
     private void ProcessDeath()
