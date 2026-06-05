@@ -16,12 +16,38 @@ public class TurnManager : MonoBehaviour
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+
+        // Event Dinleyicileri (Kayýt)
+        UnitBase.OnUnitSpawned += RegisterUnit;
+        UnitBase.OnUnitDespawned += UnregisterUnit;
+    }
+
+    private void OnDestroy()
+    {
+        // Hafýza sýzýntýsýný önlemek için Unsubscribe
+        UnitBase.OnUnitSpawned -= RegisterUnit;
+        UnitBase.OnUnitDespawned -= UnregisterUnit;
     }
 
     private void Start()
     {
         CurrentPhase = TurnPhase.Player;
-        InitializeEnemies();
+    }
+
+    private void RegisterUnit(UnitBase unit)
+    {
+        if (unit is EnemyController enemy && !activeEnemies.Contains(enemy))
+        {
+            activeEnemies.Add(enemy);
+        }
+    }
+
+    private void UnregisterUnit(UnitBase unit)
+    {
+        if (unit is EnemyController enemy)
+        {
+            activeEnemies.Remove(enemy);
+        }
     }
 
     public void FinalizePlayerTurn()
@@ -36,37 +62,15 @@ public class TurnManager : MonoBehaviour
     {
         CurrentPhase = TurnPhase.Enemy;
 
-        // Perform logic for each enemy sequentially
-        foreach (var enemy in activeEnemies)
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
         {
+            var enemy = activeEnemies[i];
             if (enemy == null) continue;
 
             enemy.BeginTurn();
             yield return new WaitForSeconds(delayBetweenEnemies);
         }
 
-        ResetToPlayerTurn();
-    }
-
-    private void ResetToPlayerTurn()
-    {
         CurrentPhase = TurnPhase.Player;
-    }
-
-    private void InitializeEnemies()
-    {
-        activeEnemies.Clear();
-        activeEnemies.AddRange(FindObjectsByType<EnemyController>(FindObjectsSortMode.None));
-    }
-
-    public void RegisterEnemy(EnemyController enemy)
-    {
-        if (!activeEnemies.Contains(enemy))
-            activeEnemies.Add(enemy);
-    }
-
-    public void UnregisterEnemy(EnemyController enemy)
-    {
-        activeEnemies.Remove(enemy);
     }
 }

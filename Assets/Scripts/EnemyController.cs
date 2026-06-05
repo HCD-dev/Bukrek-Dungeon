@@ -2,21 +2,10 @@ using UnityEngine;
 using TMPro;
 using System.Collections;
 
-public class EnemyController : MonoBehaviour
+public class EnemyController : UnitBase
 {
-    [Header("Base Stats")]
-    public string enemyName = "Karakoncolos";
-    public int maxHealth = 100;
-    public int currentHealth;
-    public int damage = 15;
-    public int attackRange = 1;
-    public int hitChance = 75;
-    public int dodgeChance = 10;
+    [Header("AI Movement")]
     public int moveRange = 2;
-
-    [Header("Movement")]
-    public float moveSpeed = 8f;
-    private bool isMoving = false;
     private Vector3 destinationPoint;
     private Vector3 lastPosition;
 
@@ -25,24 +14,20 @@ public class EnemyController : MonoBehaviour
     public TextMeshProUGUI feedbackText;
 
     private UnitController playerRef;
-    public float stepSize = 10f;
 
-    [Header("Technical")]
-    public LayerMask gridLayer;
-
-    void Start()
+    protected override void Start()
     {
-        currentHealth = maxHealth;
-        playerRef = Object.FindAnyObjectByType<UnitController>();
-
+        base.Start();
+        playerRef = FindAnyObjectByType<UnitController>();
         if (feedbackText != null) feedbackText.text = string.Empty;
-        RefreshStatusUI();
 
-        UpdateGridStatus(transform.position, true);
+        RefreshStatusUI();
+        OnHealthChanged += (current, max) => RefreshStatusUI(); // Kendi can barýný event ile günceller
     }
 
-    void Update()
+    protected override void Update()
     {
+        // AI yürüme mantýðý
         if (isMoving)
         {
             transform.position = Vector3.MoveTowards(transform.position, destinationPoint, moveSpeed * Time.deltaTime);
@@ -55,67 +40,6 @@ public class EnemyController : MonoBehaviour
                 UpdateGridStatus(transform.position, true);
             }
         }
-    }
-
-    private void UpdateGridStatus(Vector3 pos, bool occupied)
-    {
-        RaycastHit hit;
-        if (Physics.Raycast(pos + Vector3.up * 5f, Vector3.down, out hit, 10f, gridLayer))
-        {
-            TileControl tile = hit.collider.GetComponent<TileControl>();
-            if (tile != null) tile.isOccupied = occupied;
-        }
-    }
-
-    private TileControl GetTileAt(Vector3 pos)
-    {
-        RaycastHit hit;
-        if (Physics.Raycast(pos + Vector3.up * 5f, Vector3.down, out hit, 10f, gridLayer))
-        {
-            return hit.collider.GetComponent<TileControl>();
-        }
-        return null;
-    }
-
-    private bool IsSpaceOccupied(Vector3 pos)
-    {
-        float radius = stepSize * 0.4f;
-        Collider[] hits = Physics.OverlapSphere(new Vector3(pos.x, pos.y + 0.5f, pos.z), radius);
-        foreach (var col in hits)
-        {
-            if (col.GetComponent<UnitController>() != null || col.GetComponent<EnemyController>() != null)
-                return true;
-        }
-        return false;
-    }
-
-    bool IsNavigationPossible(Vector3 start, Vector3 end)
-    {
-        int startX = Mathf.RoundToInt(start.x / stepSize);
-        int startZ = Mathf.RoundToInt(start.z / stepSize);
-        int endX = Mathf.RoundToInt(end.x / stepSize);
-        int endZ = Mathf.RoundToInt(end.z / stepSize);
-
-        int stepX = (endX == startX) ? 0 : (endX > startX ? 1 : -1);
-        int stepZ = (endZ == startZ) ? 0 : (endZ > startZ ? 1 : -1);
-
-        int currX = startX;
-        int currZ = startZ;
-
-        while (currX != endX || currZ != endZ)
-        {
-            if (currX != endX) currX += stepX;
-            if (currZ != endZ) currZ += stepZ;
-
-            if (currX == endX && currZ == endZ) break;
-
-            Vector3 checkPos = new Vector3(currX * stepSize, start.y, currZ * stepSize);
-            TileControl tile = GetTileAt(checkPos);
-            if ((tile != null && tile.isOccupied) || IsSpaceOccupied(checkPos)) return false;
-        }
-
-        TileControl targetTile = GetTileAt(end);
-        return targetTile != null && !targetTile.isOccupied && !IsSpaceOccupied(end);
     }
 
     public void BeginTurn()
@@ -144,6 +68,8 @@ public class EnemyController : MonoBehaviour
             if (Mathf.RoundToInt(dist) <= attackRange) PerformStrike();
         }
     }
+
+    // ... (CalculateMovement, FindAlternativeSpot, ApplyMove, PerformStrike metodlarý ata sýnýfýn IsSpaceOccupiedByUnit ve GetTileAt yapýlarýný kullanarak korundu)
 
     private void CalculateMovement()
     {
@@ -198,6 +124,34 @@ public class EnemyController : MonoBehaviour
         if (bestSpot != transform.position) ApplyMove(bestSpot);
     }
 
+    private bool IsNavigationPossible(Vector3 start, Vector3 end)
+    {
+        int startX = Mathf.RoundToInt(start.x / stepSize);
+        int startZ = Mathf.RoundToInt(start.z / stepSize);
+        int endX = Mathf.RoundToInt(end.x / stepSize);
+        int endZ = Mathf.RoundToInt(end.z / stepSize);
+
+        int stepX = (endX == startX) ? 0 : (endX > startX ? 1 : -1);
+        int stepZ = (endZ == startZ) ? 0 : (endZ > startZ ? 1 : -1);
+
+        int currX = startX;
+        int currZ = startZ;
+
+        while (currX != endX || currZ != endZ)
+        {
+            if (currX != endX) currX += stepX;
+            if (currZ != endZ) currZ += stepZ;
+            if (currX == endX && currZ == endZ) break;
+
+            Vector3 checkPos = new Vector3(currX * stepSize, start.y, currZ * stepSize);
+            TileControl tile = GetTileAt(checkPos);
+            if ((tile != null && tile.isOccupied) || IsSpaceOccupiedByUnit(checkPos)) return false;
+        }
+
+        TileControl targetTile = GetTileAt(end);
+        return targetTile != null && !targetTile.isOccupied && !IsSpaceOccupiedByUnit(end);
+    }
+
     private void ApplyMove(Vector3 spot)
     {
         lastPosition = transform.position;
@@ -208,33 +162,19 @@ public class EnemyController : MonoBehaviour
     private void PerformStrike()
     {
         if (playerRef == null) return;
-
         int chance = hitChance - playerRef.dodgeChance;
         if (Random.Range(1, 101) <= chance)
         {
-            playerRef.TakeDamage(damage);
+            playerRef.TakeDamage(attackPower); // damage yerine abstract sýnýftaki attackPower kullanýldý
         }
     }
 
     public void SetRangeText(string msg) { if (feedbackText != null) feedbackText.text = msg; }
     public void ClearRangeText() { if (feedbackText != null) feedbackText.text = string.Empty; }
 
-    public void TakeDamage(int amount)
-    {
-        currentHealth = Mathf.Max(currentHealth - amount, 0);
-        RefreshStatusUI();
-        if (currentHealth <= 0) ProcessDeath();
-    }
-
     private void RefreshStatusUI()
     {
         if (hpDisplay != null)
             hpDisplay.text = $"HP: {currentHealth}\nDODGE: %{dodgeChance}";
-    }
-
-    private void ProcessDeath()
-    {
-        UpdateGridStatus(transform.position, false);
-        Destroy(gameObject);
     }
 }

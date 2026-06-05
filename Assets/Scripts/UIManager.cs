@@ -31,6 +31,16 @@ public class UIManager : MonoBehaviour
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+
+        // Event Abonelikleri
+        UnitController.OnUnitSelected += ShowUnitInfo;
+        UnitController.OnUnitActionPointsChanged += ShowUnitInfo;
+    }
+
+    private void OnDestroy()
+    {
+        UnitController.OnUnitSelected -= ShowUnitInfo;
+        UnitController.OnUnitActionPointsChanged -= ShowUnitInfo;
     }
 
     private void Start()
@@ -40,12 +50,16 @@ public class UIManager : MonoBehaviour
 
     public void ShowUnitInfo(UnitController unit)
     {
-        if (unit == null) return;
+        if (unit == null)
+        {
+            ResetDisplay();
+            return;
+        }
 
         nameLabel.text = $"<b>{unit.unitName}</b>";
         actionPointsLabel.text = $"AP: {unit.currentActionPoints}";
         movePointsLabel.text = $"MP: {unit.currentMovementPoints}";
-        healthLabel.text = $"HP: {unit.currentHealth} / {unit.maxHealth}";
+        healthLabel.text = $"HP: {unit.CurrentHealth} / {unit.maxHealth}";
         damageLabel.text = $"DMG: {unit.attackPower}";
         rangeLabel.text = $"RNG: {unit.attackRange}";
         hitChanceLabel.text = $"HIT: %{unit.hitChance}";
@@ -56,16 +70,15 @@ public class UIManager : MonoBehaviour
         UpdateIcons(unit);
     }
 
+    // ... (ToggleMovementMode, ToggleAttackMode ve ResetDisplay metodlarý aynen korundu)
+
     private void UpdateIcons(UnitController unit)
     {
         portraitDisplay.color = Color.white;
         portraitDisplay.sprite = unit.unitName == "Mergen" ? mergenPortrait : erlikPortrait;
-
-        // Attack Icon Logic
         attackIconSlot.sprite = unit.unitName == "Mergen" ? rangedIcon : meleeIcon;
         attackIconSlot.color = unit.currentActionPoints > 0 ? Color.white : new Color(1, 1, 1, 0.3f);
 
-        // Movement Icon Logic
         if (movementIconSlot != null)
         {
             movementIconSlot.sprite = movementIconSprite;
@@ -82,7 +95,6 @@ public class UIManager : MonoBehaviour
         damageLabel.text = string.Empty;
         rangeLabel.text = string.Empty;
         hitChanceLabel.text = string.Empty;
-
         if (dodgeLabel != null) dodgeLabel.text = string.Empty;
 
         portraitDisplay.color = Color.clear;
@@ -115,8 +127,7 @@ public class UIManager : MonoBehaviour
         UnitController[] playerUnits = FindObjectsByType<UnitController>(FindObjectsSortMode.None);
         foreach (var unit in playerUnits)
         {
-            unit.RefreshUnit(); // ResetPoints yerine yeni metod adý
-            unit.Deselect();    // DeselectUnit yerine yeni metod adý
+            unit.RefreshUnit();
         }
 
         UnitController.selectedUnit = null;
@@ -124,7 +135,7 @@ public class UIManager : MonoBehaviour
 
         if (TurnManager.Instance != null)
         {
-            TurnManager.Instance.FinalizePlayerTurn(); // OnEndTurnButtonPressed yerine yeni metod adý
+            TurnManager.Instance.FinalizePlayerTurn();
         }
     }
 
@@ -133,7 +144,4 @@ public class UIManager : MonoBehaviour
         UnitController.selectedUnit = null;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
-
-
-
 }
